@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('verifications', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained('user');
+            $table->foreignId('user_id')->constrained('users');
             $table->string('unique_id');
             $table->string('otp');
             $table->enum('type', ['register', 'reset_password']);
