@@ -1,0 +1,246 @@
+/* =========================================
+   Navbar Global Styles
+   ========================================= */
+.navbar {
+    background-color: var(--navbar-bg, #ffffff);
+    border-bottom: 2px solid var(--navbar-border, #f3f4f6);
+    padding: 0.5rem 0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+    position: relative;
+    z-index: 100;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.navbar-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+}
+
+/* =========================================
+   Logo Styles
+   ========================================= */
+.navbar-logo a {
+    display: flex;
+    align-items: center;
+}
+
+.navbar-logo img {
+    height: 70px;
+    width: auto;
+    object-fit: contain;
+}
+
+/* =========================================
+   Tombol Hamburger (tersembunyi di desktop)
+   ========================================= */
+.navbar-toggle {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    z-index: 110;
+}
+
+.hamburger-line {
+    display: block;
+    width: 26px;
+    height: 3px;
+    background-color: #1a1a2e;
+    border-radius: 3px;
+    transition: all 0.3s ease;
+}
+
+/* Animasi hamburger → X saat aktif */
+.navbar-toggle.active .hamburger-line:nth-child(1) {
+    transform: translateY(8px) rotate(45deg);
+}
+
+.navbar-toggle.active .hamburger-line:nth-child(2) {
+    opacity: 0;
+}
+
+.navbar-toggle.active .hamburger-line:nth-child(3) {
+    transform: translateY(-8px) rotate(-45deg);
+}
+
+/* =========================================
+   Menu Navigasi
+   ========================================= */
+.navbar-menu {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+}
+
+.theme-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.25rem;
+    color: var(--text-dark, #1a1a2e);
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.3s ease, transform 0.2s ease;
+    margin-left: auto; /* Pushes toggle and subsequent items to the right */
+    margin-right: 1rem;
+}
+
+.theme-toggle:hover {
+    color: #EAB308;
+    transform: rotate(15deg);
+}
+
+.nav-link {
+    text-decoration: none;
+    font-size: 1.125rem;
+    font-weight: 800;
+    transition: color 0.3s ease;
+}
+
+/* Warna kuning untuk halaman yang sedang aktif (Beranda) */
+.nav-link.active {
+    color: var(--primary, #EAB308);
+}
+
+/* Warna hitam untuk halaman yang tidak aktif */
+.nav-link:not(.active) {
+    color: var(--text-dark, #000000);
+}
+
+/* Efek saat teks menu disorot mouse */
+.nav-link:hover {
+    color: var(--primary-dark, #D97706);
+}
+
+/* =========================================
+   Tombol Login
+   ========================================= */
+.btn-login {
+    background-color: var(--primary, #FBBF24);
+    color: #ffffff;
+    text-decoration: none;
+    font-weight: 800;
+    font-size: 1.125rem;
+    padding: 0.6rem 2.5rem;
+    border-radius: 9999px;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+/* Efek saat tombol login disorot mouse */
+.btn-login:hover {
+    background-color: var(--primary-dark, #F59E0B);
+    transform: scale(1.05);
+}
+
+/* =========================================
+   Tombol Logout
+   ========================================= */
+.btn-logout {
+    background-color: #ef4444; /* Merah (Red 500) */
+    color: #ffffff;
+    text-decoration: none;
+    font-weight: 800;
+    font-size: 1.125rem;
+    padding: 0.6rem 2.5rem;
+    border-radius: 9999px;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    display: inline-block;
+}
+
+.btn-logout:hover {
+    background-color: #dc2626; /* Merah lebih gelap (Red 600) */
+    transform: scale(1.05);
+    color: #ffffff;
+}
+
+/* =========================================
+   Responsive - Mobile Dropdown
+   ========================================= */
+@media (max-width: 768px) {
+
+    /* Tampilkan tombol hamburger */
+    .navbar-toggle {
+        display: flex;
+    }
+
+    /* Menu dropdown (tersembunyi secara default) */
+    .navbar-menu {
+        display: none;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background-color: #ffffff;
+        border-top: 1px solid #f3f4f6;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+        padding: 0.5rem 0;
+        z-index: 100;
+    }
+
+    /* Tampilkan menu saat tombol diklik */
+    .navbar-menu.open {
+        display: flex;
+    }
+
+    /* Styling link menu di mobile */
+    .navbar-menu .nav-link {
+        padding: 1rem 1.5rem;
+        font-size: 1rem;
+        border-bottom: 1px solid #f3f4f6;
+        transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    .navbar-menu .nav-link:hover {
+        background-color: #fef9e7;
+    }
+
+    /* Styling tombol login & logout di mobile */
+    .navbar-menu .btn-login,
+    .navbar-menu .btn-logout {
+        margin: 0.75rem 1.5rem 1.5rem;
+        text-align: center;
+        display: block;
+        font-size: 1rem;
+        padding: 0.75rem;
+    }
+
+    .theme-toggle {
+        margin-left: auto;
+        margin-right: 0.5rem;
+        border-bottom: none;
+        padding: 0;
+    }
+}
+
+/* Dark Mode Overrides for Navbar */
+body.dark-mode {
+    --navbar-bg: #1a1a2e;
+    --navbar-border: #2d2d44;
+    --text-dark: #f8f9fa;
+}
+
+body.dark-mode .navbar-menu {
+    background-color: #1a1a2e;
+}
+
+body.dark-mode .hamburger-line {
+    background-color: #f8f9fa;
+}
+
+body.dark-mode .navbar-menu .nav-link:hover {
+    background-color: #2d2d44;
+}

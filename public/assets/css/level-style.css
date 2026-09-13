@@ -1,0 +1,266 @@
+.level-selection-container {
+    padding: 20px 0;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.game-info-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 40px;
+    border-bottom: 2px solid rgba(0, 0, 0, 0.05);
+    padding-bottom: 20px;
+}
+
+.game-title {
+    font-size: 42px;
+    font-weight: 800;
+    color: #000;
+}
+
+.progress-info {
+    font-size: 18px;
+    font-weight: 700;
+    color: #666;
+}
+
+.progress-info span {
+    color: #f8cb2e;
+}
+
+/* Level Grid Styling */
+.level-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 25px;
+    padding: 20px 0;
+}
+
+.level-card {
+    aspect-ratio: 1/1;
+    background: #fff;
+    border-radius: 24px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-decoration: none;
+    position: relative;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 3px solid transparent;
+}
+
+.level-num {
+    font-size: 36px;
+    font-weight: 800;
+    color: #000;
+}
+
+.level-status {
+    margin-top: 10px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 14px;
+}
+
+/* Unlocked State */
+.level-card.unlocked {
+    background: #fff;
+    cursor: pointer;
+}
+
+.level-card.unlocked:hover {
+    transform: translateY(-8px);
+    border-color: #f8cb2e;
+    box-shadow: 0 15px 35px rgba(248, 203, 46, 0.2);
+}
+
+.level-card.unlocked .level-status {
+    background: #f8cb2e;
+    color: #000;
+}
+
+/* Completed State */
+.level-card.completed {
+    background: #e6f7eb;
+    cursor: pointer;
+    border: 2px solid #28a745;
+}
+
+.level-card.completed:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 15px 35px rgba(40, 167, 69, 0.2);
+}
+
+.level-card.completed .level-status {
+    background: #28a745;
+    color: #fff;
+}
+
+.level-card.completed .level-num {
+    color: #1e7e34;
+}
+
+/* Locked State */
+.level-card.locked {
+    background: #f1f1f1;
+    cursor: not-allowed;
+    opacity: 0.8;
+}
+
+.level-card.locked .level-num {
+    color: #aaa;
+}
+
+.level-card.locked .level-status {
+    background: #ddd;
+    color: #888;
+}
+
+.level-card.locked::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 24px;
+}
+
+/* Back Button */
+.back-action {
+    margin-top: 50px;
+    display: flex;
+    justify-content: center;
+}
+
+.btn-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 15px 30px;
+    background: #000;
+    color: #fff;
+    border-radius: 50px;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 16px;
+    transition: all 0.3s ease;
+}
+
+.btn-back:hover {
+    transform: translateX(-5px);
+    background: #222;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+    .level-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .game-info-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+        margin-bottom: 30px;
+    }
+
+    .game-title {
+        font-size: 28px;
+    }
+    
+    .level-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+    }
+    
+    .level-card {
+        border-radius: 18px;
+        padding: 10px;
+    }
+    
+    .level-num {
+        font-size: 22px;
+    }
+
+    .level-status {
+        width: 30px;
+        height: 30px;
+        font-size: 10px;
+    }
+
+    .main-content {
+        padding: 20px 20px 100px 20px; /* Tambah padding bawah untuk navbar mobile */
+    }
+}
+
+@media (max-width: 480px) {
+    .level-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+    }
+
+    .level-card {
+        border-radius: 15px;
+    }
+
+    .level-num {
+        font-size: 18px;
+    }
+}
+
+/* DARK MODE OVERRIDES */
+body.dark-mode .game-title {
+    color: #fff;
+}
+
+body.dark-mode .game-info-header {
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+body.dark-mode .progress-info {
+    color: #a3a3b5;
+}
+
+body.dark-mode .level-card.unlocked {
+    background: #252542;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
+body.dark-mode .level-card.unlocked .level-num {
+    color: #fff;
+}
+
+body.dark-mode .level-card.completed {
+    background: #144d24;
+    border-color: #28a745;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
+body.dark-mode .level-card.completed .level-num {
+    color: #fff;
+}
+
+body.dark-mode .level-card.locked {
+    background: #1e1e2f;
+    opacity: 0.6;
+}
+
+body.dark-mode .level-card.locked .level-num {
+    color: #444;
+}
+
+body.dark-mode .btn-back {
+    background: #f8cb2e;
+    color: #1a1a2e;
+}

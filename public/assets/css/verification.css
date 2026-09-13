@@ -1,0 +1,228 @@
+body {
+    margin: 0;
+    font-family: 'Poppins', sans-serif;
+    background: #f6f6f6;
+}
+
+.login-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+.login-card {
+    background: #f9f1d1;
+    padding: 40px 60px;
+    border-radius: 20px;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    max-width: 400px;
+    width: 100%;
+}
+
+.logo-section .logo {
+    width: 150px;
+}
+
+h1 {
+    margin: 10px 0;
+    font-size: 28px;
+    font-weight: 700;
+}
+
+.uma {
+    color: #2c2c2c;
+}
+
+.think {
+    color: #f7b500;
+}
+
+h2 {
+    color: #2c2c5a;
+    font-size: 22px;
+    margin-top: 15px;
+}
+
+p {
+    color: #777;
+    font-size: 14px;
+    margin-bottom: 30px;
+}
+
+.input-group {
+    display: flex;
+    align-items: center;
+    background: #fff;
+    border-radius: 30px;
+    padding: 10px 15px;
+    margin-bottom: 20px;
+    border: 2px solid #fff;
+}
+
+.input-group input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 14px;
+    padding: 5px;
+}
+
+.icon {
+    margin-right: 10px;
+    font-size: 18px;
+}
+
+.toggle-password {
+    cursor: pointer;
+    font-size: 16px;
+    user-select: none;
+}
+
+.links {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    margin-bottom: 25px;
+}
+
+.links a {
+    text-decoration: none;
+    color: #444;
+}
+
+.register-link {
+    color: #f7b500;
+    font-weight: 600;
+}
+
+.btn-login {
+    background: #2c2c5a;
+    border: none;
+    border-radius: 30px;
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    width: 100%;
+    padding: 10px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.btn-login:hover {
+    background: #e2a800;
+}
+
+.btn-google img {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    display: inline-block;
+}
+
+.btn-google:hover img {
+    transform: scale(1.1);
+    transition: 0.2s ease;
+}
+
+/* ====== Layout khusus slide pertama (kiri-kanan) ====== */
+.side-layout {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 40px;
+    padding: 40px 60px;
+    text-align: left;
+}
+
+.onboard-left img {
+    width: 320px;
+    max-width: 90%;
+    display: block;
+    margin: 0 auto;
+}
+
+.onboard-right {
+    flex: 1;
+}
+
+.onboard-right h1 {
+    font-size: 36px;
+    margin-bottom: 5px;
+}
+
+.onboard-right .text-box {
+    max-width: 420px;
+    margin-top: 15px;
+}
+
+.onboard-right p {
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+/* Tombol lebih rapi di kanan */
+.onboard-right .btn-next,
+.onboard-right .btn-outline {
+    margin-top: 12px;
+    margin-right: 10px;
+}
+
+/* ====== Responsif HP ====== */
+@media (max-width: 768px) {
+    .side-layout {
+        flex-direction: column;
+        text-align: center;
+        padding: 30px 20px;
+    }
+
+    .onboard-left img {
+        width: 250px;
+    }
+
+    .onboard-right {
+        text-align: center;
+    }
+
+    .onboard-right .text-box {
+        margin: 0 auto 15px auto;
+    }
+}
+
+.popup-error {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #e74c3c;
+    color: white;
+    padding: 14px 22px;
+    border-radius: 12px;
+    font-size: 14px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    z-index: 9999;
+    animation: slideDown 0.4s ease, fadeOut 0.5s ease 3s forwards;
+}
+
+/* animasi muncul */
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+}
+
+/* animasi hilang */
+@keyframes fadeOut {
+    to {
+        opacity: 0;
+        transform: translate(-50%, -20px);
+    }
+}
