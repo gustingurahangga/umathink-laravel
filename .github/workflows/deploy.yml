@@ -14,13 +14,12 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v4
         with:
-          node-version: "24"
-          package-manager-cache: false
+          node-version: "20"
 
       - name: Install frontend dependencies
         run: |
@@ -33,48 +32,87 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-      - name: Create deployment archive
+      - name: Start SSH agent
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_PASSPHRASE: ${{ secrets.SSH_PASSPHRASE }}
         run: |
-          tar \
-            --exclude=".git" \
-            --exclude=".github" \
+          set -e
+
+          eval "$(ssh-agent -a "$RUNNER_TEMP/ssh-agent.sock")"
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+
+          umask 077
+
+          KEY_FILE="$RUNNER_TEMP/deploy_key"
+          PASSPHRASE_FILE="$RUNNER_TEMP/ssh_passphrase"
+          ASKPASS_FILE="$RUNNER_TEMP/ssh_askpass.sh"
+
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$KEY_FILE"
+          printf '%s\n' "$SSH_PASSPHRASE" > "$PASSPHRASE_FILE"
+
+          cat > "$ASKPASS_FILE" <<'EOF'
+          #!/bin/sh
+          cat "$RUNNER_TEMP/ssh_passphrase"
+          EOF
+
+          chmod 700 "$ASKPASS_FILE"
+
+          export SSH_ASKPASS="$ASKPASS_FILE"
+          export SSH_ASKPASS_REQUIRE=force
+
+          ssh-add "$KEY_FILE"
+
+          rm -f "$KEY_FILE"
+          rm -f "$PASSPHRASE_FILE"
+          rm -f "$ASKPASS_FILE"
+
+      - name: Add server to known hosts
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          ssh-keyscan -p 65002 153.92.13.29 >> ~/.ssh/known_hosts
+
+      - name: Test SSH connection
+        shell: bash
+        run: |
+          ssh \
+            -p 65002 \
+            -o MACs=hmac-sha2-256-etm@openssh.com \
+            rumahp25@153.92.13.29 \
+            "whoami && pwd"
+
+      - name: Deploy Laravel files
+        shell: bash
+        run: |
+          rsync -az \
             --exclude=".env" \
-            --exclude="storage" \
-            --exclude="vendor" \
-            --exclude="node_modules" \
-            -czf "$RUNNER_TEMP/deploy.tar.gz" .
+            --exclude=".git/" \
+            --exclude=".github/" \
+            --exclude="storage/" \
+            --exclude="vendor/" \
+            --exclude="node_modules/" \
+            -e "ssh -p 65002 -o MACs=hmac-sha2-256-etm@openssh.com" \
+            ./ \
+            rumahp25@153.92.13.29:/home/rumahp25/public_html/umathink-laravel/
 
-      - name: Upload deployment archive
-        uses: appleboy/scp-action@v1
-        with:
-          host: 153.92.13.29
-          username: rumahp25
-          port: 65002
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          fingerprint: "SHA256:O15G+HkYibs2OMPrSFtCJP6J8cO/GfDdkS/SyZVky4s"
-          source: "${{ runner.temp }}/deploy.tar.gz"
-          target: "/home/rumahp25"
+      - name: Install Composer dependencies
+        shell: bash
+        run: |
+          ssh \
+            -p 65002 \
+            -o MACs=hmac-sha2-256-etm@openssh.com \
+            rumahp25@153.92.13.29 \
+            "cd /home/rumahp25/public_html/umathink-laravel && composer install --no-dev --optimize-autoloader"
 
-      - name: Extract and update Laravel
-        uses: appleboy/ssh-action@v1
-        with:
-          host: 153.92.13.29
-          username: rumahp25
-          port: 65002
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          fingerprint: "SHA256:O15G+HkYibs2OMPrSFtCJP6J8cO/GfDdkS/SyZVky4s"
-          script: |
-            set -e
-
-            cd /home/rumahp25/public_html/umathink-laravel
-
-            tar -xzf /home/rumahp25/deploy.tar.gz -C /home/rumahp25/public_html/umathink-laravel
-
-            rm -f /home/rumahp25/deploy.tar.gz
-
-            composer install --no-dev --optimize-autoloader
-
-            php artisan optimize:clear
-            php artisan optimize
+      - name: Optimize Laravel
+        shell: bash
+        run: |
+          ssh \
+            -p 65002 \
+            -o MACs=hmac-sha2-256-etm@openssh.com \
+            rumahp25@153.92.13.29 \
+            "cd /home/rumahp25/public_html/umathink-laravel && php artisan optimize:clear && php artisan optimize"
