@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UmaThink - Belajar &amp; Belajar</title>
+    <title>UmaThink - Belajar &amp; Bermain</title>
     <meta name="description" content="Asah kemampuan Anda dengan berbagai macam permainan interaktif sambil mempelajari pengetahuan umum yang menarik.">
 
     {{-- Google Fonts --}}
