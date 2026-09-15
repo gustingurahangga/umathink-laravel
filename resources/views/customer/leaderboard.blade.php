@@ -35,46 +35,100 @@
 
         <main class="main-content">
             <section class="stats-row">
-                <div class="stat-card">
-                    <div class="icon-circle yellow">
-                        <img src="{{ asset('assets/img/star.png') }}" alt="Peringkat" style="width: 28px; height: 28px; object-fit: contain;">
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-value">{{ auth()->user()->peringkat }}</span>
-                        <span class="stat-label">Peringkat</span>
-                    </div>
-                </div>
 
-                <div class="stat-card">
-                    <div class="icon-circle orange">
-                        <img src="{{ asset('assets/img/trophy.png') }}" alt="Total Poin" style="width: 28px; height: 28px; object-fit: contain;">
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-value">{{ auth()->user()->total_poin ?? 0 }}</span>
-                        <span class="stat-label">Total Poin</span>
-                    </div>
-                </div>
+    <div class="stat-card">
 
-                <div class="stat-card">
-                    <div class="icon-circle green">
-                        <img src="{{ asset('assets/img/medal.png') }}" alt="Liga" style="width: 28px; height: 28px; object-fit: contain;">
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-value">{{ auth()->user()->liga }}</span>
-                        <span class="stat-label">Liga</span>
-                    </div>
-                </div>
+        <div class="icon-circle yellow">
 
-                <div class="stat-card">
-                    <div class="icon-circle orange">
-                        <i class="fa-solid fa-hourglass-half" style="font-size: 22px; color: #E67E22;"></i>
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-value">{{ $seasonDaysLeft ?? 90 }} Hari</span>
-                        <span class="stat-label">Sisa Season</span>
-                    </div>
-                </div>
-            </section>
+            <img
+                src="{{ asset('assets/img/star.png') }}"
+                alt="Peringkat"
+                style="
+                    width:28px;
+                    height:28px;
+                    object-fit:contain;
+                "
+            >
+
+        </div>
+
+        <div class="stat-info">
+
+            <span class="stat-value">
+                {{ auth()->user()->peringkat }}
+            </span>
+
+            <span class="stat-label">
+                Peringkat
+            </span>
+
+        </div>
+
+    </div>
+
+
+    <div class="stat-card">
+
+        <div class="icon-circle orange">
+
+            <img
+                src="{{ asset('assets/img/trophy.png') }}"
+                alt="Total Poin"
+                style="
+                    width:28px;
+                    height:28px;
+                    object-fit:contain;
+                "
+            >
+
+        </div>
+
+        <div class="stat-info">
+
+            <span class="stat-value">
+                {{ auth()->user()->total_poin ?? 0 }}
+            </span>
+
+            <span class="stat-label">
+                Total Poin
+            </span>
+
+        </div>
+
+    </div>
+
+
+    <div class="stat-card">
+
+        <div class="icon-circle green">
+
+            <img
+                src="{{ asset('assets/img/medal.png') }}"
+                alt="Liga"
+                style="
+                    width:28px;
+                    height:28px;
+                    object-fit:contain;
+                "
+            >
+
+        </div>
+
+        <div class="stat-info">
+
+            <span class="stat-value">
+                {{ auth()->user()->liga }}
+            </span>
+
+            <span class="stat-label">
+                Liga
+            </span>
+
+        </div>
+
+    </div>
+
+</section>
 
             <section class="leaderboard-container">
                 <div class="leaderboard-axis">

@@ -96,14 +96,38 @@
                         </div>
 
                         <form action="{{ route('game.check') }}" method="POST" id="quizForm">
-                            @csrf
-                            <input type="hidden" name="question_id" value="{{ $currentQuestion->id }}">
-                            <input type="hidden" name="slug" value="{{ $gameCategory->slug }}">
-                            <input type="hidden" name="level_number" value="{{ $levelNumber }}">
-                            <input type="hidden" name="question_number" value="{{ $questionNumber }}">
-                            <input type="hidden" name="total_questions" value="{{ $totalQuestions }}">
-                            <input type="hidden" name="poin_benar" value="{{ $currentQuestion->poin }}">
-                            <input type="hidden" name="poin_salah" value="{{ $currentQuestion->kurang_poin }}">
+
+    @csrf
+
+    <input
+        type="hidden"
+        name="question_id"
+        value="{{ $currentQuestion->id }}"
+    >
+
+    <input
+        type="hidden"
+        name="slug"
+        value="{{ $gameCategory->slug }}"
+    >
+
+    <input
+        type="hidden"
+        name="level_number"
+        value="{{ $levelNumber }}"
+    >
+
+    <input
+        type="hidden"
+        name="question_number"
+        value="{{ $questionNumber }}"
+    >
+
+    <input
+        type="hidden"
+        name="total_questions"
+        value="{{ $totalQuestions }}"
+    >            
 
                             <div class="answers-grid">
                                 @foreach($answers as $index => $answer)

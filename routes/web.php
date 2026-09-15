@@ -105,71 +105,129 @@ Route::group(['middleware' => ['auth', 'check_role:customer', 'check_status']], 
     })->name('game.dashboard');
 
     Route::get('/games/{slug}/levels', function ($slug) {
-        $game = \App\Models\GameCategory::where('slug', $slug)->firstOrFail();
 
-        if ($game->status === 'maintenance') {
-            return view('customer.maintenance', compact('game'));
+    $game = \App\Models\GameCategory::where('slug', $slug)
+        ->firstOrFail();
+
+    if ($game->status === 'maintenance') {
+        return view('customer.maintenance', compact('game'));
+    }
+
+    $user = auth()->user();
+
+    /*
+     * ==================================
+     * CEK TRYOUT
+     * ==================================
+     */
+    $isTryout =
+        strtolower($game->nama_game) === 'tryout' ||
+        strtolower($game->slug) === 'tryout';
+
+    if ($isTryout) {
+
+        $allGames = \App\Models\GameCategory::all();
+
+        foreach ($allGames as $otherGame) {
+
+            $otherIsTryout =
+                strtolower($otherGame->nama_game) === 'tryout' ||
+                strtolower($otherGame->slug) === 'tryout';
+
+            if ($otherIsTryout) {
+                continue;
+            }
+
+            $otherProgress = \App\Models\UserProgress::where(
+                'user_id',
+                $user->id
+            )
+            ->where(
+                'game_category_id',
+                $otherGame->id
+            )
+            ->first();
+
+            $unlocked = $otherProgress?->unlocked_level ?? 1;
+
+            /*
+             * Semua level harus selesai.
+             */
+            if ($unlocked <= $otherGame->jumlah_level) {
+
+                return redirect()
+                    ->route('game.dashboard')
+                    ->with(
+                        'error',
+                        'Selesaikan semua game lain terlebih dahulu untuk membuka Tryout!'
+                    );
+            }
         }
+    }
 
-        $user = auth()->user();
+    /*
+     * ==================================
+     * PROGRESS USER
+     * ==================================
+     */
+    $progress = \App\Models\UserProgress::where(
+        'user_id',
+        $user->id
+    )
+    ->where(
+        'game_category_id',
+        $game->id
+    )
+    ->first();
 
-        // Pengecekan khusus untuk Tryout
-        if (strtolower($game->nama_game) === 'tryout' || strtolower($game->slug) === 'tryout') {
-            $allGames = \App\Models\GameCategory::all();
-            $allOtherGamesFinished = true;
-            $userProgressAll = [];
-            
-            if ($user) {
-                try {
-                    $progressRecords = \App\Models\UserProgress::where('user_id', $user->id)->get();
-                    foreach ($progressRecords as $progress) {
-                        $userProgressAll[$progress->game_category_id] = $progress->unlocked_level;
-                    }
-                } catch (\Exception $e) {}
-            }
-            
-            foreach ($allGames as $g) {
-                if (strtolower($g->nama_game) !== 'tryout' && strtolower($g->slug) !== 'tryout') {
-                    $unlocked = $userProgressAll[$g->id] ?? 1;
-                    $completed = max(0, min($unlocked - 1, $g->jumlah_level));
-                    if ($completed < $g->jumlah_level) {
-                        $allOtherGamesFinished = false;
-                        break;
-                    }
-                }
-            }
-            
-            if (!$allOtherGamesFinished) {
-                return redirect()->route('game.dashboard')->with('error', 'Selesaikan semua game lain terlebih dahulu untuk membuka Tryout!');
-            }
-        }
+    /*
+     * Level 1 selalu terbuka.
+     */
+    $unlockedLevels = $progress?->unlocked_level ?? 1;
 
-        // Level 1 selalu terbuka
-        $unlockedLevels = 1;
-        
-        $user = auth()->user();
-        if ($user) {
-            try {
-                $userProgress = \App\Models\UserProgress::where('user_id', $user->id)
-                    ->where('game_category_id', $game->id)
-                    ->first();
-                if ($userProgress) {
-                    $unlockedLevels = $userProgress->unlocked_level;
-                }
-            } catch (\Exception $e) {
-                // Abaikan error
-            }
-        }
+    /*
+     * Jangan melebihi jumlah level yang tersedia.
+     */
+    $unlockedLevels = min(
+        $unlockedLevels,
+        $game->jumlah_level
+    );
 
-        $completedLevels = max(0, min($unlockedLevels - 1, $game->jumlah_level));
+    /*
+     * ==================================
+     * NILAI TERBAIK SETIAP LEVEL
+     * ==================================
+     */
+    $levelScores = \App\Models\UserLevelScore::where(
+        'user_id',
+        $user->id
+    )
+    ->where(
+        'game_category_id',
+        $game->id
+    )
+    ->get()
+    ->keyBy('level');
 
-        return view('customer.levels', [
-            'game' => $game,
-            'totalLevels' => $game->jumlah_level,
-            'unlockedLevels' => $unlockedLevels,
-            'completedLevels' => $completedLevels
-        ]);
-    })->name('game.levels');
+    /*
+     * Level dianggap selesai jika
+     * sudah mendapatkan minimal 18 poin.
+     */
+    $completedLevels = $levelScores
+        ->filter(function ($score) {
+            return $score->poin >= 18;
+        })
+        ->count();
+
+    return view('customer.levels', [
+        'game' => $game,
+        'totalLevels' => $game->jumlah_level,
+        'unlockedLevels' => $unlockedLevels,
+        'completedLevels' => $completedLevels,
+        'levelScores' => $levelScores,
+    ]);
+
+})->name('game.levels');
 
     Route::get('/games/{slug}/level/{level}/complete', [\App\Http\Controllers\GamePlayController::class, 'levelComplete'])->name('game.level.complete');
     Route::get('/games/{slug}/level/{level}/{question?}', [\App\Http\Controllers\GamePlayController::class, 'play'])->name('game.play');
@@ -178,28 +236,19 @@ Route::group(['middleware' => ['auth', 'check_role:customer', 'check_status']], 
 
 
     Route::get('/leaderboard', function () {
-        $users = \App\Models\User::where('role', 'customer')
-            ->get()
-            ->sortByDesc('total_poin')
-            ->take(10)
-            ->values();
 
-        // Hitung sisa hari season (90 hari)
-        $seasonStartedAt = \App\Models\Setting::getValue('season_started_at');
-        if (!$seasonStartedAt) {
-            $seasonStartedAt = now()->toDateTimeString();
-            \App\Models\Setting::setValue('season_started_at', $seasonStartedAt);
-        }
-        
-        $start = \Carbon\Carbon::parse($seasonStartedAt);
-        $end = $start->copy()->addDays(90);
-        $seasonDaysLeft = now()->greaterThanOrEqualTo($end) ? 0 : (int) now()->diffInDays($end);
+    $users = \App\Models\User::where('role', 'customer')
+        ->orderByDesc('total_poin')
+        ->orderBy('id')
+        ->take(10)
+        ->get();
 
-        $latestSeason = \App\Models\SeasonHistory::max('season_number') ?? 0;
-        $currentSeason = $latestSeason + 1;
+    return view(
+        'customer.leaderboard',
+        compact('users')
+    );
 
-        return view('customer.leaderboard', compact('users', 'seasonDaysLeft', 'currentSeason'));
-    })->name('game.leaderboard');
+})->name('game.leaderboard');
 });
 // ==================================
 //        GRUP ADMIN
@@ -212,37 +261,6 @@ Route::group(['middleware' => ['auth', 'check_role:admin']], function () {
     Route::get('/admin/dashboard', [DashboardadminController::class, 'index'])->name('admin.dashboard');
     Route::get('/admin/api/recent-activity', [DashboardadminController::class, 'recentActivity'])->name('admin.api.recent-activity');
 
-    Route::post('/admin/season/reset', function () {
-        $latestSeason = \App\Models\SeasonHistory::max('season_number') ?? 0;
-        $currentSeason = $latestSeason + 1;
-
-        $topUsers = \App\Models\User::where('role', 'customer')
-            ->orderBy('total_poin', 'desc')
-            ->take(3)
-            ->get();
-
-        $rank = 1;
-        foreach ($topUsers as $user) {
-            if ($user->total_poin > 0) {
-                \App\Models\SeasonHistory::create([
-                    'user_id' => $user->id,
-                    'season_number' => $currentSeason,
-                    'peringkat' => $rank,
-                    'poin' => $user->total_poin,
-                    'liga' => $user->liga,
-                ]);
-            }
-            $rank++;
-        }
-
-        \App\Models\User::where('role', 'customer')->update(['total_poin' => 0]);
-        \App\Models\UserProgress::truncate();
-
-        // Catat tanggal mulai season baru (untuk hitungan mundur 90 hari)
-        \App\Models\Setting::setValue('season_started_at', now()->toDateTimeString());
-
-        return redirect()->back()->with('success', "Season $currentSeason berhasil diakhiri! Season baru telah dimulai, poin & progress level di-reset.");
-    })->name('admin.season.reset');
 
     Route::get('/admin/users', function () {
         $users = \App\Models\User::where('role', 'customer')->get();

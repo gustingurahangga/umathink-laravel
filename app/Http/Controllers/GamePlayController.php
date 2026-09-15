@@ -2,19 +2,181 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Models\Answer;
 use App\Models\GameCategory;
 use App\Models\Question;
-use App\Models\Answer;
+use App\Models\UserLevelScore;
+use App\Models\UserProgress;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class GamePlayController extends Controller
 {
     /**
-     * Menampilkan halaman play untuk level tertentu dengan navigasi soal
+     * Jumlah soal wajib dalam satu level.
+     */
+    private const QUESTIONS_PER_LEVEL = 10;
+
+    /**
+     * Minimal poin untuk mendapatkan bintang 1
+     * dan membuka level berikutnya.
+     */
+    private const MINIMUM_PASSING_POINT = 18;
+
+    /**
+     * Menentukan poin berdasarkan jumlah jawaban benar.
+     *
+     * 0-5  = 0 poin
+     * 6    = 18 poin
+     * 7    = 21 poin
+     * 8    = 24 poin
+     * 9    = 27 poin
+     * 10   = 30 poin
+     */
+    private function calculatePoint(int $correctAnswers): int
+    {
+        if ($correctAnswers <= 5) {
+            return 0;
+        }
+
+        return $correctAnswers * 3;
+    }
+
+    /**
+     * Menentukan bintang berdasarkan jumlah jawaban benar.
+     *
+     * 0-5  = 0 bintang
+     * 6-7  = 1 bintang
+     * 8-9  = 2 bintang
+     * 10   = 3 bintang
+     */
+    private function calculateStars(int $correctAnswers): int
+    {
+        if ($correctAnswers <= 5) {
+            return 0;
+        }
+
+        if ($correctAnswers <= 7) {
+            return 1;
+        }
+
+        if ($correctAnswers <= 9) {
+            return 2;
+        }
+
+        return 3;
+    }
+
+    /**
+     * Menghitung ulang total poin user
+     * berdasarkan nilai terbaik setiap level.
+     *
+     * Jadi tidak terjadi:
+     * 18 + 21 + 27
+     *
+     * untuk level yang sama.
+     */
+    private function recalculateTotalPoints($user): void
+    {
+        $totalPoin = UserLevelScore::where('user_id', $user->id)
+            ->sum('poin');
+
+        $user->total_poin = $totalPoin;
+
+        /*
+         * Simpan pencapaian poin tertinggi user.
+         */
+        if ($totalPoin > ($user->highest_poin ?? 0)) {
+            $user->highest_poin = $totalPoin;
+            $user->highest_liga = $user->liga;
+        }
+
+        /*
+         * Ranking terbaik.
+         */
+        $currentRank = $user->peringkat;
+
+        if (is_numeric($currentRank)) {
+            if (
+                is_null($user->highest_peringkat) ||
+                $currentRank < $user->highest_peringkat
+            ) {
+                $user->highest_peringkat = $currentRank;
+            }
+        }
+
+        $user->save();
+    }
+
+    /**
+     * Mengecek apakah level boleh dimainkan.
+     */
+    private function canPlayLevel($user, GameCategory $gameCategory, int $levelNumber): bool
+    {
+        if ($levelNumber < 1) {
+            return false;
+        }
+
+        if ($levelNumber > $gameCategory->jumlah_level) {
+            return false;
+        }
+
+        /*
+         * Level 1 selalu terbuka.
+         */
+        if ($levelNumber === 1) {
+            return true;
+        }
+
+        $progress = UserProgress::where('user_id', $user->id)
+            ->where('game_category_id', $gameCategory->id)
+            ->first();
+
+        $unlockedLevel = $progress?->unlocked_level ?? 1;
+
+        return $levelNumber <= $unlockedLevel;
+    }
+
+    /**
+     * Mengecek apakah semua game selain Tryout
+     * sudah diselesaikan.
+     */
+    private function allOtherGamesFinished($user): bool
+    {
+        $games = GameCategory::all();
+
+        foreach ($games as $game) {
+            $isTryout =
+                strtolower($game->nama_game) === 'tryout' ||
+                strtolower($game->slug) === 'tryout';
+
+            if ($isTryout) {
+                continue;
+            }
+
+            $progress = UserProgress::where('user_id', $user->id)
+                ->where('game_category_id', $game->id)
+                ->first();
+
+            $unlockedLevel = $progress?->unlocked_level ?? 1;
+
+            /*
+             * Jika unlocked_level = jumlah_level + 1,
+             * berarti seluruh level sudah selesai.
+             */
+            if ($unlockedLevel <= $game->jumlah_level) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Memulai / menampilkan soal.
      */
     public function play($slug, $level, $questionNumber = 1)
     {
-        // Cari GameCategory berdasarkan slug
         $gameCategory = GameCategory::where('slug', $slug)->firstOrFail();
 
         if ($gameCategory->status === 'maintenance') {
@@ -23,261 +185,518 @@ class GamePlayController extends Controller
 
         $user = auth()->user();
 
-        // Pengecekan khusus untuk Tryout
-        if (strtolower($gameCategory->nama_game) === 'tryout' || strtolower($gameCategory->slug) === 'tryout') {
-            $allGames = \App\Models\GameCategory::all();
-            $allOtherGamesFinished = true;
-            $userProgressAll = [];
-            
-            if ($user) {
-                try {
-                    $progressRecords = \App\Models\UserProgress::where('user_id', $user->id)->get();
-                    foreach ($progressRecords as $progress) {
-                        $userProgressAll[$progress->game_category_id] = $progress->unlocked_level;
-                    }
-                } catch (\Exception $e) {}
-            }
-            
-            foreach ($allGames as $g) {
-                if (strtolower($g->nama_game) !== 'tryout' && strtolower($g->slug) !== 'tryout') {
-                    $unlocked = $userProgressAll[$g->id] ?? 1;
-                    $completed = max(0, min($unlocked - 1, $g->jumlah_level));
-                    if ($completed < $g->jumlah_level) {
-                        $allOtherGamesFinished = false;
-                        break;
-                    }
-                }
-            }
-            
-            if (!$allOtherGamesFinished) {
-                return redirect()->route('game.dashboard')->with('error', 'Selesaikan semua game lain terlebih dahulu untuk membuka Tryout!');
-            }
+        $levelNumber = (int) $level;
+        $questionNumber = (int) $questionNumber;
+
+        /*
+         * ================================
+         * CEK TRYOUT
+         * ================================
+         */
+        $isTryout =
+            strtolower($gameCategory->nama_game) === 'tryout' ||
+            strtolower($gameCategory->slug) === 'tryout';
+
+        if ($isTryout && !$this->allOtherGamesFinished($user)) {
+            return redirect()
+                ->route('game.dashboard')
+                ->with(
+                    'error',
+                    'Selesaikan semua game lain terlebih dahulu untuk membuka Tryout!'
+                );
         }
 
-        $levelNumber = intval($level);
-        $questionNumber = intval($questionNumber);
-
-        $questions = collect();
-        $currentQuestion = null;
-        $answers = [];
-        $totalQuestions = 0;
-        $useFallback = false;
-
-        $sessionKey = "current_question_{$slug}_level_{$levelNumber}";
-        $expectedQuestionNumber = session($sessionKey, 1);
-
-        
-        if ($questionNumber < $expectedQuestionNumber) {
-            return redirect()->route('game.play', ['slug' => $slug, 'level' => $levelNumber, 'question' => $expectedQuestionNumber])
-                             ->with('error', 'Anda tidak dapat kembali ke soal sebelumnya!');
+        /*
+         * ================================
+         * CEK LEVEL
+         * ================================
+         */
+        if (!$this->canPlayLevel($user, $gameCategory, $levelNumber)) {
+            return redirect()
+                ->route('game.levels', $gameCategory->slug)
+                ->with(
+                    'error',
+                    'Level tersebut masih terkunci. Dapatkan minimal 18 poin atau 1 bintang pada level sebelumnya.'
+                );
         }
 
-       
-        if ($questionNumber > $expectedQuestionNumber) {
-            session([$sessionKey => $questionNumber]);
+        /*
+         * ================================
+         * AMBIL SOAL
+         * ================================
+         */
+        $questions = Question::where('game_category_id', $gameCategory->id)
+            ->where('level', $levelNumber)
+            ->orderBy('id', 'asc')
+            ->get();
+
+        /*
+         * Client menetapkan:
+         * 1 level = 10 soal.
+         */
+        if ($questions->count() !== self::QUESTIONS_PER_LEVEL) {
+            return redirect()
+                ->route('game.levels', $gameCategory->slug)
+                ->with(
+                    'error',
+                    "Level {$levelNumber} belum siap. Level harus memiliki tepat 10 soal."
+                );
         }
 
-   
-        try {
-            $questions = Question::where('game_category_id', $gameCategory->id)
-                ->where('level', $levelNumber)
-                ->orderBy('id', 'asc')
-                ->get();
-
-            if ($questions->isNotEmpty()) {
-                $totalQuestions = $questions->count();
-
-                // Validasi nomor soal
-                if ($questionNumber < 1 || $questionNumber > $totalQuestions) {
-                    $questionNumber = 1;
-                }
-
-                $currentQuestion = $questions[$questionNumber - 1];
-                $answers = $currentQuestion->answers()->get();
-            }
-        } catch (\Exception $e) {
-            // Abaikan error jika tabel belum dimigrasi
+        if ($questionNumber < 1 || $questionNumber > self::QUESTIONS_PER_LEVEL) {
+            $questionNumber = 1;
         }
 
+        /*
+         * ================================
+         * SESSION ATTEMPT
+         * ================================
+         *
+         * Setiap pengerjaan ulang dimulai
+         * dari soal pertama.
+         */
+        $attemptKey = "quiz_attempt_{$slug}_level_{$levelNumber}";
+        $currentQuestionKey = "current_question_{$slug}_level_{$levelNumber}";
+        $answersKey = "quiz_answers_{$slug}_level_{$levelNumber}";
 
+        /*
+         * Jika user baru masuk level,
+         * buat percobaan baru.
+         */
+        if (
+            $questionNumber === 1 &&
+            !session()->has($currentQuestionKey)
+        ) {
+            session([
+                $attemptKey => true,
+                $currentQuestionKey => 1,
+                $answersKey => [],
+            ]);
+        }
 
-        return view('customer.halamanplay', compact(
-            'gameCategory',
-            'levelNumber',
-            'currentQuestion',
-            'answers',
-            'questionNumber',
-            'totalQuestions'
-        ));
+        /*
+         * Jika user mencoba membuka soal
+         * sebelum nomor yang seharusnya.
+         */
+        $expectedQuestion = (int) session($currentQuestionKey, 1);
+
+        if ($questionNumber < $expectedQuestion) {
+            return redirect()
+                ->route('game.play', [
+                    'slug' => $slug,
+                    'level' => $levelNumber,
+                    'question' => $expectedQuestion,
+                ])
+                ->with(
+                    'error',
+                    'Anda tidak dapat kembali ke soal sebelumnya!'
+                );
+        }
+
+        /*
+         * Jangan izinkan lompat soal.
+         */
+        if ($questionNumber > $expectedQuestion) {
+            return redirect()
+                ->route('game.play', [
+                    'slug' => $slug,
+                    'level' => $levelNumber,
+                    'question' => $expectedQuestion,
+                ]);
+        }
+
+        $currentQuestion = $questions[$questionNumber - 1];
+
+        $answers = $currentQuestion->answers()
+            ->orderBy('id', 'asc')
+            ->get();
+
+        $totalQuestions = self::QUESTIONS_PER_LEVEL;
+
+        return view(
+            'customer.halamanplay',
+            compact(
+                'gameCategory',
+                'levelNumber',
+                'currentQuestion',
+                'answers',
+                'questionNumber',
+                'totalQuestions'
+            )
+        );
     }
 
     /**
-     * Memproses jawaban dan pindah ke soal berikutnya jika benar
+     * Memeriksa jawaban user.
+     *
+     * Poin TIDAK diberikan per soal.
+     * Poin dihitung setelah 10 soal selesai.
      */
     public function check(Request $request)
     {
-        $questionId = intval($request->input('question_id'));
-        $selectedAnswerId = intval($request->input('selected_answer'));
+        $request->validate([
+            'question_id' => 'required|integer',
+            'slug' => 'required|string',
+            'level_number' => 'required|integer|min:1',
+            'question_number' => 'required|integer|min:1|max:10',
+            'total_questions' => 'required|integer',
+            'selected_answer' => 'nullable|integer',
+        ]);
+
+        $user = auth()->user();
+
         $slug = $request->input('slug');
-        
-        $gameCategory = GameCategory::where('slug', $slug)->first();
-        if ($gameCategory && $gameCategory->status === 'maintenance') {
+        $levelNumber = (int) $request->input('level_number');
+        $questionNumber = (int) $request->input('question_number');
+        $selectedAnswerId = (int) ($request->input('selected_answer') ?? 0);
+
+        $gameCategory = GameCategory::where('slug', $slug)->firstOrFail();
+
+        if ($gameCategory->status === 'maintenance') {
             return view('customer.maintenance', compact('gameCategory'));
         }
 
-        $levelNumber = intval($request->input('level_number'));
-        $questionNumber = intval($request->input('question_number'));
-        $totalQuestions = intval($request->input('total_questions'));
+        /*
+         * Cek apakah level masih boleh dimainkan.
+         */
+        if (!$this->canPlayLevel($user, $gameCategory, $levelNumber)) {
+            return redirect()
+                ->route('game.levels', $gameCategory->slug)
+                ->with('error', 'Level tersebut masih terkunci.');
+        }
 
+        /*
+         * Pastikan level benar-benar mempunyai 10 soal.
+         */
+        $questions = Question::where('game_category_id', $gameCategory->id)
+            ->where('level', $levelNumber)
+            ->orderBy('id', 'asc')
+            ->get();
+
+        if ($questions->count() !== self::QUESTIONS_PER_LEVEL) {
+            return redirect()
+                ->route('game.levels', $gameCategory->slug)
+                ->with(
+                    'error',
+                    "Level {$levelNumber} harus memiliki tepat 10 soal."
+                );
+        }
+
+        $question = Question::findOrFail(
+            (int) $request->input('question_id')
+        );
+
+        /*
+         * Pastikan soal memang milik game + level tersebut.
+         */
+        if (
+            $question->game_category_id != $gameCategory->id ||
+            $question->level != $levelNumber
+        ) {
+            abort(403, 'Soal tidak valid.');
+        }
+
+        /*
+         * Pastikan nomor soal sesuai dengan ID soal.
+         */
+        $expectedQuestion = $questions[$questionNumber - 1];
+
+        if ($expectedQuestion->id !== $question->id) {
+            abort(403, 'Urutan soal tidak valid.');
+        }
+
+        /*
+         * Pastikan user tidak mengirim ulang
+         * soal yang sudah dijawab.
+         */
+        $currentQuestionKey = "current_question_{$slug}_level_{$levelNumber}";
+        $answersKey = "quiz_answers_{$slug}_level_{$levelNumber}";
+
+        $expectedQuestionNumber = (int) session(
+            $currentQuestionKey,
+            1
+        );
+
+        if ($questionNumber !== $expectedQuestionNumber) {
+            return redirect()
+                ->route('game.play', [
+                    'slug' => $slug,
+                    'level' => $levelNumber,
+                    'question' => $expectedQuestionNumber,
+                ])
+                ->with(
+                    'error',
+                    'Soal tersebut sudah diproses.'
+                );
+        }
+
+        /*
+         * ================================
+         * CEK JAWABAN
+         * ================================
+         */
         $isCorrect = false;
 
-        // 1. Coba periksa di database
-        try {
-            $answerRecord = Answer::find($selectedAnswerId);
-            if ($answerRecord) {
-                $isCorrect = $answerRecord->is_correct;
-            }
-        } catch (\Exception $e) {
-            // Abaikan error jika database belum siap
-        }
+        if ($selectedAnswerId > 0) {
+            $answer = Answer::where('id', $selectedAnswerId)
+                ->where('question_id', $question->id)
+                ->first();
 
-        // 2. Fallback ke session (untuk data dinamis generator)
-        if (!$isCorrect) {
-            $correctSessionId = session("correct_answer_for_" . $questionId);
-            if ($correctSessionId !== null && $selectedAnswerId === $correctSessionId) {
-                $isCorrect = true;
+            if ($answer) {
+                $isCorrect = (bool) $answer->is_correct;
             }
         }
 
-        $poinBenar = intval($request->input('poin_benar', 10));
-        $poinSalah = intval($request->input('poin_salah', 5));
+        /*
+         * Simpan hasil jawaban dalam session.
+         *
+         * Contoh:
+         * [
+         *     1 => true,
+         *     2 => false,
+         *     3 => true
+         * ]
+         */
+        $attemptAnswers = session($answersKey, []);
 
-        /** @var \App\Models\User|null $user */
-        $user = auth()->user();
-        
-        // Simpan progress soal yang sudah dijawab benar di session
-        $progressKey = "progress_{$slug}_level_{$levelNumber}";
-        $progress = session($progressKey, []);
-        $alreadyAnswered = in_array($questionNumber, $progress);
-        
-        $message = "";
-        $messageType = "";
+        $attemptAnswers[$questionNumber] = $isCorrect;
 
-        if ($isCorrect) {
-            if (!$alreadyAnswered) {
-                // Tambah poin pengguna
-                if ($user) {
-                    try {
-                        $user->total_poin = ($user->total_poin ?? 0) + $poinBenar;
-                        
-                        if ($user->total_poin > ($user->highest_poin ?? 0)) {
-                            $user->highest_poin = $user->total_poin;
-                            $user->highest_liga = $user->liga;
-                        }
-                        
-                        $currentPeringkat = $user->peringkat;
-                        if (is_numeric($currentPeringkat)) {
-                            if (is_null($user->highest_peringkat) || $currentPeringkat < $user->highest_peringkat) {
-                                $user->highest_peringkat = $currentPeringkat;
-                            }
-                        }
+        session([
+            $answersKey => $attemptAnswers,
+            $currentQuestionKey => $questionNumber + 1,
+        ]);
 
-                        $user->save();
-                    } catch (\Exception $ex) {
-                        // Abaikan jika kolom total_poin belum ada
-                    }
+        /*
+         * Pembahasan.
+         */
+        $pembahasan = $question->pembahasan;
+
+        /*
+         * ================================
+         * JIKA MASIH ADA SOAL
+         * ================================
+         */
+        if ($questionNumber < self::QUESTIONS_PER_LEVEL) {
+
+            if ($isCorrect) {
+                $message = 'Benar! 🎉 Lanjut ke soal berikutnya.';
+                $messageType = 'success';
+            } else {
+                if ($selectedAnswerId === 0) {
+                    $message = 'Waktu habis! Jawaban tidak dipilih. Lanjut ke soal berikutnya.';
+                } else {
+                    $message = 'Yah! Jawaban salah. Tetap semangat!';
                 }
-                
-                // Tambahkan ke progress
-                $progress[] = $questionNumber;
-                session([$progressKey => $progress]);
+
+                $messageType = 'error';
             }
 
-            $poinMsg = $alreadyAnswered ? '' : " (+{$poinBenar} Poin)";
-            $message = "Benar! 🎉 Lanjut ke soal berikutnya.{$poinMsg}";
+            return redirect()
+                ->route('game.play', [
+                    'slug' => $slug,
+                    'level' => $levelNumber,
+                    'question' => $questionNumber + 1,
+                ])
+                ->with($messageType, $message)
+                ->with('pembahasan', $pembahasan);
+        }
+
+        /*
+         * ================================
+         * LEVEL SELESAI
+         * ================================
+         */
+
+        /*
+         * Pastikan semua 10 jawaban sudah tercatat.
+         */
+        $correctAnswers = collect($attemptAnswers)
+            ->filter(fn ($value) => $value === true)
+            ->count();
+
+        /*
+         * Hitung poin berdasarkan jumlah benar.
+         */
+        $poin = $this->calculatePoint($correctAnswers);
+
+        /*
+         * Hitung bintang.
+         */
+        $stars = $this->calculateStars($correctAnswers);
+
+        /*
+         * Ambil nilai terbaik sebelumnya.
+         */
+        $previousScore = UserLevelScore::where('user_id', $user->id)
+            ->where('game_category_id', $gameCategory->id)
+            ->where('level', $levelNumber)
+            ->first();
+
+        $previousPoin = $previousScore?->poin ?? 0;
+        $previousStars = $previousScore?->stars ?? 0;
+        $previousCorrect = $previousScore?->correct_answers ?? 0;
+
+        /*
+         * Default:
+         * nilai percobaan sekarang belum tentu
+         * menjadi nilai terbaik.
+         */
+        $isNewBestScore = false;
+
+        /*
+         * HANYA update jika hasil sekarang lebih tinggi.
+         */
+        if (
+            !$previousScore ||
+            $poin > $previousPoin ||
+            (
+                $poin === $previousPoin &&
+                $correctAnswers > $previousCorrect
+            )
+        ) {
+            UserLevelScore::updateOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'game_category_id' => $gameCategory->id,
+                    'level' => $levelNumber,
+                ],
+                [
+                    'correct_answers' => $correctAnswers,
+                    'poin' => $poin,
+                    'stars' => $stars,
+                ]
+            );
+
+            $isNewBestScore = true;
+        }
+
+        /*
+         * Ambil score terbaik setelah update.
+         */
+        $bestScore = UserLevelScore::where('user_id', $user->id)
+            ->where('game_category_id', $gameCategory->id)
+            ->where('level', $levelNumber)
+            ->first();
+
+        $bestPoin = $bestScore?->poin ?? 0;
+        $bestStars = $bestScore?->stars ?? 0;
+        $bestCorrect = $bestScore?->correct_answers ?? 0;
+
+        /*
+         * ================================
+         * UNLOCK LEVEL BERIKUTNYA
+         * ================================
+         *
+         * Yang digunakan adalah BEST SCORE,
+         * bukan skor percobaan terakhir.
+         */
+        if ($bestPoin >= self::MINIMUM_PASSING_POINT) {
+
+            $userProgress = UserProgress::firstOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'game_category_id' => $gameCategory->id,
+                ],
+                [
+                    'unlocked_level' => 1,
+                ]
+            );
+
+            $nextLevel = $levelNumber + 1;
+
+            /*
+             * Jika next level masih tersedia,
+             * buka level tersebut.
+             */
+            if (
+                $nextLevel <= $gameCategory->jumlah_level &&
+                $nextLevel > $userProgress->unlocked_level
+            ) {
+                $userProgress->update([
+                    'unlocked_level' => $nextLevel,
+                ]);
+            }
+
+            /*
+             * Jika level terakhir selesai,
+             * unlocked_level menjadi jumlah_level + 1.
+             *
+             * Ini digunakan agar sistem mengetahui
+             * bahwa seluruh level telah selesai.
+             */
+            if (
+                $levelNumber === $gameCategory->jumlah_level &&
+                $userProgress->unlocked_level <= $gameCategory->jumlah_level
+            ) {
+                $userProgress->update([
+                    'unlocked_level' => $gameCategory->jumlah_level + 1,
+                ]);
+            }
+        }
+
+        /*
+         * ================================
+         * UPDATE TOTAL POIN
+         * ================================
+         *
+         * Total poin = jumlah nilai terbaik
+         * dari setiap level.
+         */
+        DB::transaction(function () use ($user) {
+            $this->recalculateTotalPoints($user);
+        });
+
+        /*
+         * Bersihkan session percobaan.
+         */
+        session()->forget([
+            $currentQuestionKey,
+            $answersKey,
+            "quiz_attempt_{$slug}_level_{$levelNumber}",
+        ]);
+
+        /*
+         * Hasil percobaan sekarang.
+         */
+        if ($poin >= self::MINIMUM_PASSING_POINT) {
+            $message = "Level selesai! Kamu mendapatkan {$stars} bintang dan {$poin} poin.";
             $messageType = 'success';
         } else {
-            // Kurangi poin pengguna saat salah menjawab
-            if ($user && $poinSalah > 0 && !$alreadyAnswered) {
-                try {
-                    $user->total_poin = max(0, ($user->total_poin ?? 0) - $poinSalah);
-                    $user->save();
-                } catch (\Exception $ex) {
-                    // Abaikan jika kolom total_poin belum ada
-                }
-                
-                // Tandai sebagai dijawab agar poin tidak terus berkurang, dan agar adil karena pindah ke soal berikutnya
-                $progress[] = $questionNumber;
-                session([$progressKey => $progress]);
-            }
-
-            $poinMsg = $alreadyAnswered ? '' : " (-{$poinSalah} Poin)";
-            if ($selectedAnswerId == 0) {
-                $message = "Waktu Habis! Anda tidak memilih jawaban.{$poinMsg} Lanjut ke soal berikutnya.";
-            } else {
-                $message = "Yah! Jawaban Salah.{$poinMsg} Lanjut ke soal berikutnya.";
-            }
+            $message = "Level selesai. Kamu mendapatkan {$stars} bintang dan {$poin} poin. Minimal 18 poin untuk membuka level berikutnya.";
             $messageType = 'error';
         }
 
-        // Ambil pembahasan soal saat ini
-        $pembahasan = null;
-        try {
-            $currentQuestionModel = Question::find($questionId);
-            if ($currentQuestionModel && !empty($currentQuestionModel->pembahasan)) {
-                $pembahasan = $currentQuestionModel->pembahasan;
-            }
-        } catch (\Exception $e) {}
+        /*
+         * Apakah level berikutnya tersedia?
+         */
+        $nextLevel = $levelNumber + 1;
 
-        // Set soal berikutnya di session agar tidak bisa kembali
-        $sessionKey = "current_question_{$slug}_level_{$levelNumber}";
-        session([$sessionKey => $questionNumber + 1]);
+        $hasNextLevel =
+            $nextLevel <= $gameCategory->jumlah_level &&
+            $bestPoin >= self::MINIMUM_PASSING_POINT;
 
-        // Cek apakah masih ada soal berikutnya
-        if ($questionNumber < $totalQuestions) {
-            // Pindah ke soal berikutnya
-            $nextQuestion = $questionNumber + 1;
-            return redirect()
-                ->route('game.play', ['slug' => $slug, 'level' => $levelNumber, 'question' => $nextQuestion])
-                ->with($messageType, $message)
-                ->with('pembahasan', $pembahasan);
-        } else {
-            // Semua soal di level ini selesai
-            
-            // Hapus session current question karena level sudah selesai
-            session()->forget($sessionKey);
-            
-            // Buka level berikutnya
-            if ($user) {
-                try {
-                    $gameCategory = GameCategory::where('slug', $slug)->first();
-                    if ($gameCategory) {
-                        $userProgress = \App\Models\UserProgress::firstOrCreate(
-                            ['user_id' => $user->id, 'game_category_id' => $gameCategory->id],
-                            ['unlocked_level' => 1]
-                        );
-                        
-                        $nextLevelToUnlock = $levelNumber + 1;
-                        
-                        if ($nextLevelToUnlock > $userProgress->unlocked_level && $nextLevelToUnlock <= $gameCategory->jumlah_level + 1) {
-                            $userProgress->update(['unlocked_level' => $nextLevelToUnlock]);
-                        }
-                    }
-                } catch (\Exception $e) {
-                    // Abaikan jika tabel progress belum ada
-                }
-            }
-            
-            return redirect()
-                ->route('game.level.complete', ['slug' => $slug, 'level' => $levelNumber])
-                ->with('level_complete', true)
-                ->with($messageType, $message)
-                ->with('pembahasan', $pembahasan);
-        }
+        /*
+         * Redirect ke halaman hasil level.
+         */
+        return redirect()
+            ->route('game.level.complete', [
+                'slug' => $slug,
+                'level' => $levelNumber,
+            ])
+            ->with('level_complete', true)
+            ->with($messageType, $message)
+            ->with('pembahasan', $pembahasan)
+            ->with('attempt_correct', $correctAnswers)
+            ->with('attempt_poin', $poin)
+            ->with('attempt_stars', $stars)
+            ->with('best_correct', $bestCorrect)
+            ->with('best_poin', $bestPoin)
+            ->with('best_stars', $bestStars)
+            ->with('is_new_best', $isNewBestScore);
     }
 
     /**
-     * Menampilkan halaman selesai level
+     * Halaman hasil setelah menyelesaikan level.
      */
     public function levelComplete($slug, $level)
     {
@@ -287,44 +706,76 @@ class GamePlayController extends Controller
             return view('customer.maintenance', compact('gameCategory'));
         }
 
-        $levelNumber = intval($level);
+        $levelNumber = (int) $level;
 
-        // Hitung total soal di level ini
-        $totalQuestions = 0;
-        try {
-            $totalQuestions = Question::where('game_category_id', $gameCategory->id)
-                ->where('level', $levelNumber)
-                ->count();
-        } catch (\Exception $e) {}
-
-        if ($totalQuestions === 0) {
-            $totalQuestions = 3; // fallback
+        /*
+         * Pastikan level valid.
+         */
+        if (
+            $levelNumber < 1 ||
+            $levelNumber > $gameCategory->jumlah_level
+        ) {
+            return redirect()
+                ->route('game.levels', $gameCategory->slug)
+                ->with('error', 'Level tidak ditemukan.');
         }
 
-        // Hitung total poin
-        $totalPoin = 0;
-        try {
-            $totalPoin = Question::where('game_category_id', $gameCategory->id)
-                ->where('level', $levelNumber)
-                ->sum('poin');
-        } catch (\Exception $e) {}
+        /*
+         * Ambil hasil percobaan dari session.
+         */
+        $attemptCorrect = (int) session('attempt_correct', 0);
+        $attemptPoin = (int) session('attempt_poin', 0);
+        $attemptStars = (int) session('attempt_stars', 0);
 
-        if ($totalPoin == 0) {
-             // Fallback point calculations
-             $totalPoin = $totalQuestions * 10;
-        }
+        /*
+         * Ambil nilai terbaik dari database.
+         */
+        $bestScore = UserLevelScore::where('user_id', auth()->id())
+            ->where('game_category_id', $gameCategory->id)
+            ->where('level', $levelNumber)
+            ->first();
 
-        // Cek apakah ada level berikutnya
+        $bestCorrect = $bestScore?->correct_answers ?? $attemptCorrect;
+        $bestPoin = $bestScore?->poin ?? $attemptPoin;
+        $bestStars = $bestScore?->stars ?? $attemptStars;
+
+        /*
+         * Jumlah soal selalu 10.
+         */
+        $totalQuestions = self::QUESTIONS_PER_LEVEL;
+
+        /*
+         * Level berikutnya.
+         */
         $nextLevel = $levelNumber + 1;
-        $hasNextLevel = $nextLevel <= $gameCategory->jumlah_level;
 
-        return view('customer.level_complete', compact(
-            'gameCategory',
-            'levelNumber',
-            'totalQuestions',
-            'totalPoin',
-            'nextLevel',
-            'hasNextLevel'
-        ));
+        /*
+         * Boleh lanjut hanya jika:
+         * - masih ada level berikutnya
+         * - best score minimal 18
+         */
+        $hasNextLevel =
+            $nextLevel <= $gameCategory->jumlah_level &&
+            $bestPoin >= self::MINIMUM_PASSING_POINT;
+
+        return view('customer.level_complete', [
+            'gameCategory' => $gameCategory,
+            'levelNumber' => $levelNumber,
+
+            'totalQuestions' => $totalQuestions,
+
+            'attemptCorrect' => $attemptCorrect,
+            'attemptPoin' => $attemptPoin,
+            'attemptStars' => $attemptStars,
+
+            'bestCorrect' => $bestCorrect,
+            'bestPoin' => $bestPoin,
+            'bestStars' => $bestStars,
+
+            'nextLevel' => $nextLevel,
+            'hasNextLevel' => $hasNextLevel,
+
+            'isNewBest' => session('is_new_best', false),
+        ]);
     }
 }
