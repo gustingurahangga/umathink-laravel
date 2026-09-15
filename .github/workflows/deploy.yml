@@ -71,13 +71,24 @@ jobs:
       - name: Add server to known hosts
         shell: bash
         run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
+         set -e
+
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+
+          touch "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
 
           ssh-keyscan \
+            -T 15 \
             -p 65002 \
             -t rsa \
-            153.92.13.29 > ~/.ssh/known_hosts
+            153.92.13.29 >> "$HOME/.ssh/known_hosts"
+
+          if [ ! -s "$HOME/.ssh/known_hosts" ]; then
+            echo "Gagal mendapatkan SSH host key dari server."
+            exit 1
+          fi
 
       - name: Test SSH connection
         shell: bash
