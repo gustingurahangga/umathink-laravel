@@ -74,7 +74,10 @@ jobs:
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
-          ssh-keyscan -p 65002 -t rsa 153.92.13.29 > ~/.ssh/known_hosts
+          ssh-keyscan \
+            -p 65002 \
+            -t rsa \
+            153.92.13.29 > ~/.ssh/known_hosts
 
       - name: Test SSH connection
         shell: bash
@@ -108,7 +111,17 @@ jobs:
             -o HostKeyAlgorithms=rsa-sha2-512,rsa-sha2-256 \
             -o MACs=hmac-sha2-256-etm@openssh.com \
             rumahp25@153.92.13.29 \
-            "cd /home/rumahp25/public_html/umathink-laravel && composer install --no-dev --optimize-autoloader"
+            "cd /home/rumahp25/public_html/umathink-laravel && composer install --no-dev --optimize-autoloader --no-scripts"
+
+      - name: Discover Laravel packages
+        shell: bash
+        run: |
+          ssh \
+            -p 65002 \
+            -o HostKeyAlgorithms=rsa-sha2-512,rsa-sha2-256 \
+            -o MACs=hmac-sha2-256-etm@openssh.com \
+            rumahp25@153.92.13.29 \
+            "cd /home/rumahp25/public_html/umathink-laravel && php artisan package:discover --ansi"
 
       - name: Optimize Laravel
         shell: bash
