@@ -36,15 +36,15 @@ jobs:
       - name: Create deployment archive
         run: |
           tar \
-            --exclude=".git" \
+             --exclude=".git" \
             --exclude=".github" \
             --exclude=".env" \
             --exclude="storage" \
             --exclude="vendor" \
             --exclude="node_modules" \
-            -czf deploy.tar.gz .
+            -czf "$RUNNER_TEMP/deploy.tar.gz" .
 
-      - name: Upload deployment archive
+      - name: Upload deployment archive 
         uses: appleboy/scp-action@v1
         with:
           host: 153.92.13.29
@@ -53,7 +53,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           fingerprint: "SHA256:tuI7rPE7OwhanBExApSv4eyGq2gipFvXO+V27iSR5xA"
-          source: "deploy.tar.gz"
+          source: "${{ runner.temp }}/deploy.tar.gz"
           target: "/home/rumahp25"
 
       - name: Extract and update Laravel
