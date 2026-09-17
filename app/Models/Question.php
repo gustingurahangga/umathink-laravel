@@ -12,10 +12,16 @@ class Question extends Model
         'game_category_id',
         'level',
         'teks_soal',
+        'tipe_soal',
+        'data_matching',
         'poin',
         'kurang_poin',
         'waktu',
         'pembahasan',
+    ];
+
+    protected $casts = [
+        'data_matching' => 'array',
     ];
 
     /**

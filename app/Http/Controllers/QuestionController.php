@@ -130,129 +130,372 @@ class QuestionController extends Controller
      */
     public function downloadTemplate()
     {
-        $filePath = public_path('templatesoal_umathink.xlsx');
+        $filePath = storage_path('app/templates/Template Soal Umathink NEW.xlsx');
 
         if (!file_exists($filePath)) {
             return redirect()->back()->withErrors(['File template tidak ditemukan di server.']);
         }
 
-        return response()->download($filePath, 'template_impor_soal.xlsx');
+        return response()->download($filePath, 'Template Soal Umathink NEW.xlsx');
     }
 
     /**
      * Proses impor soal dari Excel atau CSV
      */
     public function import(Request $request)
-    {
-        // Tingkatkan memory limit & waktu eksekusi agar tidak terjadi timeout/memory exhausted saat load Excel
-        ini_set('memory_limit', '512M');
-        set_time_limit(180);
+{
+    ini_set('memory_limit', '512M');
+    set_time_limit(180);
 
-        $request->validate([
-            'file_soal' => 'required|file|mimes:xlsx,xls,csv,txt|max:4096',
-        ], [
-            'file_soal.required' => 'Pilih file terlebih dahulu!',
-            'file_soal.mimes' => 'Format file harus berupa .xlsx, .xls, atau .csv',
-            'file_soal.max' => 'Ukuran file maksimal adalah 4MB',
-        ]);
+    $request->validate([
+        'file_soal' => 'required|file|mimes:xlsx,xls,csv,txt|max:4096',
+    ], [
+        'file_soal.required' => 'Pilih file terlebih dahulu!',
+        'file_soal.mimes' => 'Format file harus berupa .xlsx, .xls, atau .csv',
+        'file_soal.max' => 'Ukuran file maksimal adalah 4MB',
+    ]);
 
-        $file = $request->file('file_soal');
-        $extension = strtolower($file->getClientOriginalExtension());
-        
-        $rows = [];
+    $file = $request->file('file_soal');
+    $extension = strtolower($file->getClientOriginalExtension());
+    $rows = [];
 
-        // 1. Parsing File CSV atau Excel
-        if ($extension === 'csv' || $extension === 'txt') {
-            $delimiter = ',';
-            if (($handle = fopen($file->getRealPath(), 'r')) !== false) {
-                // Deteksi delimiter (koma atau titik koma)
-                $firstLine = fgets($handle);
-                if (strpos($firstLine, ';') !== false && strpos($firstLine, ',') === false) {
-                    $delimiter = ';';
-                }
-                rewind($handle);
+    // Baca CSV / TXT
+    if ($extension === 'csv' || $extension === 'txt') {
+        $delimiter = ',';
 
-                // Baca baris
-                while (($data = fgetcsv($handle, 1000, $delimiter)) !== false) {
-                    $rows[] = $data;
-                }
-                fclose($handle);
+        if (($handle = fopen($file->getRealPath(), 'r')) !== false) {
+            $firstLine = fgets($handle);
+
+            if (
+                strpos($firstLine, ';') !== false &&
+                strpos($firstLine, ',') === false
+            ) {
+                $delimiter = ';';
             }
-        } else {
-            // Excel parsing (.xlsx / .xls) menggunakan PhpSpreadsheet
-            try {
-                // Gunakan reader dengan mode read data only agar menghemat memori dan menghindari crash
-                $reader = IOFactory::createReaderForFile($file->getRealPath());
-                $reader->setReadDataOnly(true);
-                $spreadsheet = $reader->load($file->getRealPath());
-                $worksheet = $spreadsheet->getActiveSheet();
-                $rows = $worksheet->toArray();
-            } catch (\Throwable $e) {
-                return redirect()->back()->withErrors(['Gagal membaca file Excel: ' . $e->getMessage()]);
+
+            rewind($handle);
+
+            while (($data = fgetcsv($handle, 0, $delimiter)) !== false) {
+                $rows[] = $data;
             }
+
+            fclose($handle);
         }
-
-        if (count($rows) <= 1) {
-            return redirect()->back()->withErrors(['File kosong atau hanya berisi baris header!']);
-        }
-
-        // Hapus baris pertama hingga baris header (3 baris: judul + 2 baris kosong + header kolom)
-        // File Excel template memiliki: baris 1 = judul, baris 2-3 = kosong, baris 4 = header
-        $skippedHeaderRows = 0;
-        foreach ($rows as $key => $row) {
-            // Deteksi baris header berdasarkan kolom pertama yang berisi nama kolom
-            $firstCell = strtolower(trim((string)($row[0] ?? '')));
-            if (in_array($firstCell, ['kategori', 'nama_game', 'game'])) {
-                // Hapus semua baris hingga dan termasuk baris header
-                $rows = array_slice($rows, $key + 1);
-                $skippedHeaderRows = $key + 1;
-                break;
-            }
-        }
-
-        // Jika tidak menemukan header khusus, hapus hanya baris pertama
-        if ($skippedHeaderRows === 0) {
-            array_shift($rows);
-        }
-        
-        $importedCount = 0;
-        $skippedCount = 0;
-
-        // DB Transaction agar aman jika ada error di tengah jalan
-        \DB::beginTransaction();
-
+    } else {
+        // Baca Excel
         try {
-            foreach ($rows as $index => $row) {
-                // Pastikan kolom esensial terisi (minimal ada 8 kolom, 10 dengan poin)
-                if (count($row) < 8) {
+            $reader = IOFactory::createReaderForFile($file->getRealPath());
+            $reader->setReadDataOnly(true);
+
+            $spreadsheet = $reader->load($file->getRealPath());
+            $worksheet = $spreadsheet->getActiveSheet();
+            $rows = $worksheet->toArray();
+        } catch (\Throwable $e) {
+            return redirect()->back()->withErrors([
+                'Gagal membaca file Excel: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    if (count($rows) <= 1) {
+        return redirect()->back()->withErrors([
+            'File kosong atau hanya berisi header!'
+        ]);
+    }
+
+    /*
+     * Template baru:
+     *
+     * Nama Game
+     * Level
+     * Tipe Soal
+     * Soal
+     * A
+     * B
+     * C
+     * D
+     * BENAR
+     * DATA MATCHING
+     * WAKTU
+     * PEMBAHASAN
+     */
+
+    $headerIndex = null;
+    $headerMap = [];
+
+    foreach ($rows as $key => $row) {
+        $normalized = array_map(function ($value) {
+            return strtolower(trim((string) $value));
+        }, $row);
+
+        if (
+            in_array('nama game', $normalized) ||
+            in_array('nama_game', $normalized) ||
+            in_array('kategori', $normalized)
+        ) {
+            $headerIndex = $key;
+
+            foreach ($normalized as $index => $column) {
+                $headerMap[$column] = $index;
+            }
+
+            break;
+        }
+    }
+
+    if ($headerIndex === null) {
+        return redirect()->back()->withErrors([
+            'Header template tidak ditemukan. Gunakan Template Soal Umathink NEW.xlsx.'
+        ]);
+    }
+
+    // Buang semua baris sebelum header
+    $rows = array_slice($rows, $headerIndex + 1);
+
+    // Helper mengambil nilai berdasarkan nama kolom
+    $getValue = function ($row, array $names) use ($headerMap) {
+        foreach ($names as $name) {
+            $name = strtolower(trim($name));
+
+            if (isset($headerMap[$name])) {
+                $index = $headerMap[$name];
+
+                return isset($row[$index])
+                    ? trim((string) $row[$index])
+                    : '';
+            }
+        }
+
+        return '';
+    };
+
+    // Helper untuk membaca DATA MATCHING
+    $parseMatching = function (string $value): array {
+        $value = trim($value);
+
+        if ($value === '') {
+            return [];
+        }
+
+        /*
+         * Format Excel:
+         * Terang=Cahaya;Cerdas=Pandai;Luas=Lebar
+         */
+
+        $parts = preg_split('/\s*;\s*/', $value);
+        $result = [];
+
+        foreach ($parts as $part) {
+            $part = trim($part);
+
+            if ($part === '') {
+                continue;
+            }
+
+            if (!str_contains($part, '=')) {
+                continue;
+            }
+
+            [$left, $right] = array_map(
+                'trim',
+                explode('=', $part, 2)
+            );
+
+            if ($left !== '' && $right !== '') {
+                $result[] = [
+                    'kiri' => $left,
+                    'kanan' => $right,
+                ];
+            }
+        }
+
+        return $result;
+    };
+
+    $importedCount = 0;
+    $skippedCount = 0;
+
+    \DB::beginTransaction();
+
+    try {
+        foreach ($rows as $row) {
+
+            // Lewati baris kosong
+            $hasData = count(array_filter($row, function ($value) {
+                return trim((string) $value) !== '';
+            })) > 0;
+
+            if (!$hasData) {
+                continue;
+            }
+
+            $kategoriName = $getValue($row, [
+                'nama game',
+                'nama_game',
+                'kategori',
+                'game'
+            ]);
+
+            $levelStr = $getValue($row, ['level']);
+            $level = $levelStr !== '' ? intval($levelStr) : 0;
+
+            $teksSoal = $getValue($row, [
+                'soal',
+                'teks soal',
+                'teks_soal'
+            ]);
+            $tipeSoal = strtolower($getValue($row, [
+                'tipe soal',
+                'tipe_soal'
+            ]));
+
+            $tipeSoal = str_replace(
+                [' ', '-'],
+                '_',
+                $tipeSoal
+            );
+
+            $jawabanA = $getValue($row, ['a']);
+            $jawabanB = $getValue($row, ['b']);
+            $jawabanC = $getValue($row, ['c']);
+            $jawabanD = $getValue($row, ['d']);
+
+            $kunci = strtoupper($getValue($row, [
+                'benar',
+                'kunci',
+                'kunci jawaban',
+                'kunci_jawaban'
+            ]));
+
+            $dataMatchingText = $getValue($row, [
+                'data matching',
+                'data_matching'
+            ]);
+
+            $waktuText = $getValue($row, ['waktu']);
+            $waktuDetik = $waktuText !== ''
+                ? intval($waktuText)
+                : 60;
+
+            $pembahasan = $getValue($row, ['pembahasan']);
+
+            if (!in_array($tipeSoal, ['pilihan_ganda', 'pernyataan', 'matching'], true)) {
+                $skippedCount++;
+                continue;
+            }
+
+            if (
+                $kategoriName === '' ||
+                $level <= 0 ||
+                $teksSoal === ''
+            ) {
+                $skippedCount++;
+                continue;
+            }
+
+            // Cari / buat game
+            $gameCategory = GameCategory::firstOrCreate(
+                ['nama_game' => $kategoriName],
+                ['jumlah_level' => $level]
+            );
+
+            // Sinkronisasi jumlah level
+            if ($level > $gameCategory->jumlah_level) {
+                $gameCategory->update([
+                    'jumlah_level' => $level
+                ]);
+            }
+
+            /*
+             * Hitung nomor soal dalam level.
+             *
+             * 1, 2, 3, 4, 5,
+             * 6, 7, 8, 9, 10,
+             * dst.
+             */
+            $nomorSoal = Question::where(
+                'game_category_id',
+                $gameCategory->id
+            )
+                ->where('level', $level)
+                ->count() + 1;
+
+            /*
+             * Soal 5, 10, 15, 20, dst.
+             * otomatis menjadi MATCHING.
+             */
+            $seharusnyaMatching = ($nomorSoal % 5 === 0);
+            $isMatching = ($tipeSoal === 'matching');
+
+            if ($seharusnyaMatching !== $isMatching) {
+                $skippedCount++;
+                continue;
+            }
+
+            if ($isMatching) {
+
+                if ($dataMatchingText === '') {
                     $skippedCount++;
                     continue;
                 }
 
-                // Ambil data dengan konversi type cast (string) untuk menghindari error trim(null) di PHP 8.1+
-                $kategoriName = isset($row[0]) ? trim((string)$row[0]) : '';
-                $levelStr = isset($row[1]) ? trim((string)$row[1]) : '';
-                $level = $levelStr !== '' ? intval($levelStr) : 0;
-                $teksSoal = isset($row[2]) ? trim((string)$row[2]) : '';
-                $jawabanA = isset($row[3]) ? trim((string)$row[3]) : '';
-                $jawabanB = isset($row[4]) ? trim((string)$row[4]) : '';
-                $jawabanC = isset($row[5]) ? trim((string)$row[5]) : '';
-                $jawabanD = isset($row[6]) ? trim((string)$row[6]) : '';
-                $kunci = isset($row[7]) ? strtoupper(trim((string)$row[7])) : '';
+                $matchingPairs = $parseMatching($dataMatchingText);
 
-                // Kolom poin (opsional — default: poin=10, kurang_poin=5)
-                $poinBenar = isset($row[8]) && trim((string)$row[8]) !== '' ? intval($row[8]) : 10;
-                $poinSalah = isset($row[9]) && trim((string)$row[9]) !== '' ? intval($row[9]) : 5;
-                
-                $waktuDetik = isset($row[10]) && trim((string)$row[10]) !== '' ? intval($row[10]) : 60;
-                $pembahasan = isset($row[11]) ? trim((string)$row[11]) : '';
-
-                // Jika data wajib kosong, lewati
-                if (empty($kategoriName) || $level <= 0 || empty($teksSoal)) {
+                // Minimal 2 pasangan untuk matching.
+                if (count($matchingPairs) < 2) {
                     $skippedCount++;
                     continue;
                 }
 
+                Question::create([
+                    'game_category_id' => $gameCategory->id,
+                    'level' => $level,
+                    'teks_soal' => $teksSoal,
+                    'tipe_soal' => 'matching',
+                    'data_matching' => $matchingPairs,
+                    'poin' => 10,
+                    'kurang_poin' => 5,
+                    'waktu' => $waktuDetik > 0 ? $waktuDetik : 60,
+                    'pembahasan' => $pembahasan,
+                ]);
+
+            } elseif ($tipeSoal === 'pernyataan') {
+
+                // Tipe pernyataan hanya menggunakan kunci YA atau SALAH.
+                $kunciPernyataan = strtoupper(trim($kunci));
+
+                if (!in_array($kunciPernyataan, ['YA', 'SALAH'], true)) {
+                    $skippedCount++;
+                    continue;
+                }
+
+                $question = Question::create([
+                    'game_category_id' => $gameCategory->id,
+                    'level' => $level,
+                    'teks_soal' => $teksSoal,
+                    'tipe_soal' => 'pernyataan',
+                    'data_matching' => null,
+                    'poin' => 10,
+                    'kurang_poin' => 5,
+                    'waktu' => $waktuDetik > 0 ? $waktuDetik : 60,
+                    'pembahasan' => $pembahasan,
+                ]);
+
+                Answer::create([
+                    'question_id' => $question->id,
+                    'teks_jawaban' => 'YA',
+                    'is_correct' => ($kunciPernyataan === 'YA'),
+                ]);
+
+                Answer::create([
+                    'question_id' => $question->id,
+                    'teks_jawaban' => 'SALAH',
+                    'is_correct' => ($kunciPernyataan === 'SALAH'),
+                ]);
+
+            } else {
+
+                // Tipe pilihan_ganda menggunakan A, B, C, D.
                 $options = [
                     'A' => $jawabanA,
                     'B' => $jawabanB,
@@ -260,37 +503,28 @@ class QuestionController extends Controller
                     'D' => $jawabanD,
                 ];
 
-                // Pastikan kunci jawaban valid dan tidak kosong
-                if (!in_array($kunci, ['A', 'B', 'C', 'D']) || empty($options[$kunci])) {
+                if (
+                    !in_array($kunci, ['A', 'B', 'C', 'D'], true) ||
+                    empty($options[$kunci])
+                ) {
                     $skippedCount++;
                     continue;
                 }
 
-                // Cari atau buat kategori game
-                $gameCategory = GameCategory::firstOrCreate(
-                    ['nama_game' => $kategoriName],
-                    ['jumlah_level' => $level]
-                );
-
-                // Sinkronisasi jumlah level jika level yang diimpor lebih besar
-                if ($level > $gameCategory->jumlah_level) {
-                    $gameCategory->update(['jumlah_level' => $level]);
-                }
-
-                // Simpan Question dengan poin, waktu, dan pembahasan
                 $question = Question::create([
                     'game_category_id' => $gameCategory->id,
                     'level' => $level,
                     'teks_soal' => $teksSoal,
-                    'poin' => $poinBenar,
-                    'kurang_poin' => $poinSalah,
-                    'waktu' => $waktuDetik,
+                    'tipe_soal' => 'pilihan_ganda',
+                    'data_matching' => null,
+                    'poin' => 10,
+                    'kurang_poin' => 5,
+                    'waktu' => $waktuDetik > 0 ? $waktuDetik : 60,
                     'pembahasan' => $pembahasan,
                 ]);
 
-                // Simpan Answers yang tidak kosong
                 foreach ($options as $key => $value) {
-                    if (!empty($value)) {
+                    if ($value !== '') {
                         Answer::create([
                             'question_id' => $question->id,
                             'teks_jawaban' => $value,
@@ -298,21 +532,29 @@ class QuestionController extends Controller
                         ]);
                     }
                 }
-
-                $importedCount++;
             }
 
-            \DB::commit();
-        } catch (\Throwable $e) {
-            \DB::rollBack();
-            return redirect()->back()->withErrors(['Terjadi kesalahan saat mengimpor data: ' . $e->getMessage()]);
+            $importedCount++;
         }
 
-        $message = "Berhasil mengimpor {$importedCount} soal!";
-        if ($skippedCount > 0) {
-            $message .= " ({$skippedCount} baris tidak valid dilewati)";
-        }
+        \DB::commit();
 
-        return redirect()->back()->with('success', $message);
+    } catch (\Throwable $e) {
+
+        \DB::rollBack();
+
+        return redirect()->back()->withErrors([
+            'Terjadi kesalahan saat mengimpor data: ' . $e->getMessage()
+        ]);
     }
+
+    $message = "Berhasil mengimpor {$importedCount} soal!";
+
+    if ($skippedCount > 0) {
+        $message .= " ({$skippedCount} baris tidak valid dilewati)";
+    }
+
+    return redirect()->back()->with('success', $message);
 }
+}
+

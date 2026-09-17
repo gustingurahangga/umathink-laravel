@@ -2,13 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-
 class DashboardadminController extends Controller
 {
     public function index()
     {
         $totalPengguna = \App\Models\User::where('role', 'customer')->count();
+
         $topPlayers = \App\Models\User::where('role', 'customer')
             ->get()
             ->sortByDesc('total_poin')
@@ -19,11 +18,8 @@ class DashboardadminController extends Controller
         $soalCount = \App\Models\Question::count();
         $totalLevel = \App\Models\GameCategory::sum('jumlah_level');
 
-        // Ambil 10 aktivitas terbaru berdasarkan user_progress (user yang terakhir mengerjakan game)
+        // Aktivitas terbaru
         $activity = $this->getRecentActivity();
-
-        $latestSeason = \App\Models\SeasonHistory::max('season_number') ?? 0;
-        $currentSeason = $latestSeason + 1;
 
         return view('admin.dashboard', [
             'totalPengguna' => $totalPengguna,
@@ -32,7 +28,6 @@ class DashboardadminController extends Controller
             'totalLevel' => $totalLevel,
             'activity' => $activity,
             'topPlayers' => $topPlayers,
-            'currentSeason' => $currentSeason
         ]);
     }
 
@@ -70,7 +65,7 @@ class DashboardadminController extends Controller
                 ->orderBy('updated_at', 'desc')
                 ->take(10)
                 ->get()
-                ->map(function($item) {
+                ->map(function ($item) {
                     return (object) [
                         'type' => 'game_play',
                         'username' => $item->user->username ?? '-',
@@ -78,7 +73,9 @@ class DashboardadminController extends Controller
                         'level' => $item->unlocked_level,
                         'total_poin' => $item->user->total_poin ?? 0,
                         'time' => $item->updated_at ?? now(),
-                        'time_human' => $item->updated_at ? $item->updated_at->diffForHumans() : 'Baru saja'
+                        'time_human' => $item->updated_at
+                            ? $item->updated_at->diffForHumans()
+                            : 'Baru saja',
                     ];
                 });
 
@@ -86,7 +83,7 @@ class DashboardadminController extends Controller
                 ->orderBy('created_at', 'desc')
                 ->take(10)
                 ->get()
-                ->map(function($user) {
+                ->map(function ($user) {
                     return (object) [
                         'type' => 'register',
                         'username' => $user->username,
@@ -94,16 +91,18 @@ class DashboardadminController extends Controller
                         'level' => '-',
                         'total_poin' => $user->total_poin ?? 0,
                         'time' => $user->created_at ?? now(),
-                        'time_human' => $user->created_at ? $user->created_at->diffForHumans() : 'Baru saja'
+                        'time_human' => $user->created_at
+                            ? $user->created_at->diffForHumans()
+                            : 'Baru saja',
                     ];
                 });
 
-            $combined = $progress->concat($registrations)
+            return $progress
+                ->concat($registrations)
                 ->sortByDesc('time')
                 ->take(10)
                 ->values();
 
-            return $combined;
         } catch (\Exception $e) {
             return collect();
         }

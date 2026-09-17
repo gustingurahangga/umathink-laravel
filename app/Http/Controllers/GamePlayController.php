@@ -311,6 +311,20 @@ class GamePlayController extends Controller
             ->orderBy('id', 'asc')
             ->get();
 
+        // Data khusus soal matching.
+        $matchingPairs = [];
+        $matchingOptions = [];
+
+        if ($currentQuestion->tipe_soal === 'matching') {
+            $matchingPairs = $currentQuestion->data_matching ?? [];
+
+            $matchingOptions = collect($matchingPairs)
+                ->pluck('kanan')
+                ->shuffle()
+                ->values()
+                ->toArray();
+        }
+
         $totalQuestions = self::QUESTIONS_PER_LEVEL;
 
         return view(
@@ -320,6 +334,8 @@ class GamePlayController extends Controller
                 'levelNumber',
                 'currentQuestion',
                 'answers',
+                'matchingPairs',
+                'matchingOptions',
                 'questionNumber',
                 'totalQuestions'
             )
@@ -341,6 +357,7 @@ class GamePlayController extends Controller
             'question_number' => 'required|integer|min:1|max:10',
             'total_questions' => 'required|integer',
             'selected_answer' => 'nullable|integer',
+            'matching_answers' => 'nullable|string',
         ]);
 
         $user = auth()->user();
@@ -437,13 +454,63 @@ class GamePlayController extends Controller
          */
         $isCorrect = false;
 
-        if ($selectedAnswerId > 0) {
-            $answer = Answer::where('id', $selectedAnswerId)
-                ->where('question_id', $question->id)
-                ->first();
+        if ($question->tipe_soal === 'matching') {
+            /*
+             * Matching dikirim sebagai JSON:
+             * {
+             *     "Terang": "Cahaya",
+             *     "Cerdas": "Pandai"
+             * }
+             */
+            $submittedRaw = (string) $request->input('matching_answers', '{}');
+            $submitted = json_decode($submittedRaw, true);
 
-            if ($answer) {
-                $isCorrect = (bool) $answer->is_correct;
+            if (is_array($submitted)) {
+                $correctPairs = [];
+
+                foreach (($question->data_matching ?? []) as $pair) {
+                    if (
+                        is_array($pair) &&
+                        isset($pair['kiri']) &&
+                        isset($pair['kanan'])
+                    ) {
+                        $correctPairs[trim((string) $pair['kiri'])] =
+                            trim((string) $pair['kanan']);
+                    }
+                }
+
+                $submittedPairs = [];
+
+                foreach ($submitted as $kiri => $kanan) {
+                    if (
+                        is_string($kiri) &&
+                        is_string($kanan) &&
+                        trim($kiri) !== '' &&
+                        trim($kanan) !== ''
+                    ) {
+                        $submittedPairs[trim($kiri)] = trim($kanan);
+                    }
+                }
+
+                ksort($correctPairs);
+                ksort($submittedPairs);
+
+                // Semua pasangan harus tepat agar soal bernilai benar.
+                $isCorrect =
+                    !empty($correctPairs) &&
+                    $correctPairs === $submittedPairs;
+            }
+
+        } else {
+            // Pilihan ganda dan pernyataan menggunakan tabel answers.
+            if ($selectedAnswerId > 0) {
+                $answer = Answer::where('id', $selectedAnswerId)
+                    ->where('question_id', $question->id)
+                    ->first();
+
+                if ($answer) {
+                    $isCorrect = (bool) $answer->is_correct;
+                }
             }
         }
 

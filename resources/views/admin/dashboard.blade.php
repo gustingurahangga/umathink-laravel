@@ -143,20 +143,6 @@
                             </tbody>
                         </table>
                     </div>
-
-                    <!-- Season Management: kotak kecil -->
-                    <div class="season-mini-box">
-                        <div class="season-mini-info">
-                            <p class="season-mini-label">Season Aktif</p>
-                            <h4 class="season-mini-value">Season {{ $currentSeason ?? 1 }}</h4>
-                        </div>
-                        <form action="{{ route('admin.season.reset') }}" method="POST" onsubmit="return confirm('PERINGATAN!\n\nApakah Anda yakin ingin MENGAKHIRI Season {{ $currentSeason ?? 1 }}?\n- Poin SEMUA pengguna akan di-reset menjadi 0.\n- Top 3 Peringkat akan diabadikan di Profil mereka.\n\nTindakan ini tidak dapat dibatalkan!');">
-                            @csrf
-                            <button type="submit" class="season-mini-btn">
-                                <i class="fa-solid fa-power-off"></i> Season Baru
-                            </button>
-                        </form>
-                    </div>
                 </div>
             </section>
         </main>
@@ -177,75 +163,6 @@
         }
         #activityTableBody tr.new-row {
             animation: fadeIn 0.4s ease;
-        }
-
-        /* Season Management - kotak kecil */
-        .season-mini-box {
-            margin-top: 15px;
-            padding: 22px 20px; /* Digedekan sedikit kebawahnya */
-            border-radius: 12px;
-            background-color: #FFFFFF; /* Light mode bg */
-            border: 1px solid #EEE; /* Light mode border */
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 10px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.02);
-        }
-
-        body.dark-mode .season-mini-box {
-            background-color: #252542; /* Dark mode bg */
-            border-color: #3b3b5c; /* Dark mode border */
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-        }
-
-        .season-mini-info {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .season-mini-label {
-            margin: 0;
-            font-size: 12px;
-            color: #888; /* Light mode text */
-            font-weight: 600;
-        }
-
-        body.dark-mode .season-mini-label {
-            color: #a3a3b5; /* Dark mode text */
-        }
-
-        .season-mini-value {
-            margin: 4px 0 0;
-            font-size: 16px;
-            font-weight: 800;
-            color: #000; /* Light mode text */
-        }
-
-        body.dark-mode .season-mini-value {
-            color: #F8CB2E; /* Dark mode text */
-        }
-
-        .season-mini-btn {
-            background-color: #E74C3C;
-            color: #fff;
-            border: none;
-            padding: 10px 16px;
-            border-radius: 8px;
-            font-weight: 700;
-            font-family: 'Inter', sans-serif;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 13px;
-            box-shadow: 0 4px 10px rgba(231, 76, 60, 0.25);
-            transition: all 0.3s ease;
-            white-space: nowrap;
-        }
-
-        .season-mini-btn:hover {
-            transform: translateY(-2px);
         }
     </style>
 
@@ -298,3 +215,4 @@
 
 </body>
 </html>
+
