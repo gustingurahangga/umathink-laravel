@@ -1,4 +1,7 @@
-/* Dasar & Layout Utama */
+/* =========================================================
+   DASAR & LAYOUT UTAMA
+========================================================= */
+
 * {
     box-sizing: border-box;
     margin: 0;
@@ -15,7 +18,11 @@ body {
     display: flex;
 }
 
-/* SIDEBAR */
+
+/* =========================================================
+   SIDEBAR
+========================================================= */
+
 .sidebar {
     width: 130px;
     background-color: #ffffff;
@@ -59,16 +66,25 @@ body {
     align-self: flex-start;
 }
 
-/* MAIN CONTENT */
+
+/* =========================================================
+   MAIN CONTENT
+========================================================= */
+
 .main-content {
     flex-grow: 1;
     padding: 40px 60px;
+    min-width: 0;
 }
 
-/* STAT CARDS */
+
+/* =========================================================
+   STAT CARDS
+========================================================= */
+
 .stats-row {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 20px;
     margin-bottom: 50px;
 }
@@ -82,6 +98,7 @@ body {
     gap: 15px;
     box-shadow: 0 4px 10px rgba(230, 126, 34, 0.15);
     border: 1px solid #FFE0B2;
+    min-width: 0;
 }
 
 .icon-circle {
@@ -92,6 +109,7 @@ body {
     justify-content: center;
     align-items: center;
     font-size: 20px;
+    flex-shrink: 0;
 }
 
 .icon-circle.yellow {
@@ -113,25 +131,34 @@ body {
 .stat-info {
     display: flex;
     flex-direction: column;
+    min-width: 0;
 }
 
 .stat-value {
     font-size: 24px;
     font-weight: 800;
     color: #E67E22;
+    line-height: 1.2;
 }
 
 .stat-label {
     font-size: 13px;
     font-weight: 700;
     color: #333;
+    margin-top: 3px;
 }
 
-/* LEADERBOARD TABLE (AXIS STYLE) */
+
+/* =========================================================
+   LEADERBOARD TABLE
+========================================================= */
+
 .leaderboard-axis {
     margin-top: 20px;
     position: relative;
+    width: 100%;
 }
+
 
 /* Garis vertikal sumbu */
 .leaderboard-axis::before {
@@ -142,209 +169,675 @@ body {
     width: 4px;
     height: calc(100% - 20px);
     background-color: #000;
+    z-index: 0;
 }
 
+
+/* =========================================================
+   STRUKTUR GRID
+========================================================= */
+
+/*
+   Kolom:
+   1. Username
+   2. Bintang
+   3. Klaster
+*/
+.table-header,
+.rank-item .rank-content {
+    display: grid !important;
+
+    /*
+       Kolom username fleksibel,
+       Bintang 180px,
+       Klaster 300px
+    */
+    grid-template-columns:
+        minmax(0, 1fr) 180px 300px;
+
+    align-items: center;
+    width: 100%;
+}
+
+
+/* =========================================================
+   TABLE HEADER
+========================================================= */
+
 .table-header {
-    display: flex;
     padding: 0 0 15px 20px;
     margin-left: 60px;
+    width: calc(100% - 60px);
+
     border-bottom: 4px solid #000;
-    /* Garis horizontal sumbu */
     margin-bottom: 20px;
+
     font-weight: 800;
     font-size: 18px;
 }
 
-.col-user {
-    flex: 2;
-    text-align: center;
+
+/* =========================================================
+   HEADER KOLOM
+========================================================= */
+
+.table-header .col-user {
+    text-align: left !important;
+    padding-left: 20px;
 }
 
-.col-points {
-    flex: 1;
-    text-align: center;
+.table-header .col-points {
+    text-align: center !important;
 }
 
-.col-league {
-    flex: 1;
-    text-align: center;
+.table-header .col-league {
+    text-align: center !important;
 }
+
+
+/* =========================================================
+   KOLOM DATA
+========================================================= */
+
+.rank-item .col-user {
+    min-width: 0;
+    width: auto !important;
+    flex: none !important;
+
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+
+    text-align: left !important;
+}
+
+
+.rank-item .col-points {
+    width: 180px !important;
+    min-width: 180px;
+
+    flex: none !important;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    text-align: center !important;
+
+    gap: 6px;
+}
+
+
+.rank-item .col-league {
+    width: 300px !important;
+    min-width: 300px;
+
+    flex: none !important;
+
+    display: flex;
+    align-items: center;
+    justify-content: center !important;
+
+    text-align: center !important;
+
+    gap: 10px;
+}
+
+
+/* =========================================================
+   RANK ITEM
+========================================================= */
 
 .rank-item {
     display: flex;
     align-items: center;
+
     margin-bottom: 25px;
     position: relative;
+    z-index: 1;
+
+    width: 100%;
 }
 
+
+/* Nomor ranking */
 .rank-number {
     width: 60px;
+    min-width: 60px;
+
     padding-right: 15px;
+
     text-align: right;
+
     font-size: 24px;
     font-weight: 800;
     color: #000;
+
+    flex-shrink: 0;
 }
 
+
+/* Kontainer isi */
 .rank-content {
     flex-grow: 1;
-    height: 40px;
+
+    min-width: 0;
+
+    min-height: 40px;
+
     margin-left: 20px;
-    /* Ruang untuk isi data nantinya */
 }
 
-/* Highlight Baris Pengguna Saat Ini */
+
+/* =========================================================
+   AVATAR USER
+========================================================= */
+
+.leaderboard-avatar {
+    width: 36px;
+    height: 36px;
+
+    border-radius: 50%;
+
+    object-fit: cover;
+
+    border: 2px solid #e0e0e0;
+
+    flex-shrink: 0;
+
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.current-user-row .leaderboard-avatar {
+    border-color: #F8CB2E;
+}
+
+
+/* =========================================================
+   BINTANG
+========================================================= */
+
+.col-points img {
+    width: 22px;
+    height: 22px;
+
+    object-fit: contain;
+
+    flex-shrink: 0;
+}
+
+
+/* =========================================================
+   KLASTER
+========================================================= */
+
+.league-wrapper {
+    position: relative;
+
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    flex-shrink: 0;
+}
+
+
+/*
+   Wrapper khusus logo klaster
+*/
+.cluster-wrapper {
+    width: 42px;
+    height: 42px;
+
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    flex-shrink: 0;
+}
+
+
+/* Logo klaster */
+.league-icon {
+    width: 40px;
+    height: 40px;
+
+    object-fit: contain;
+
+    position: relative;
+    z-index: 2;
+
+    flex-shrink: 0;
+}
+
+
+/* =========================================================
+   HIGHLIGHT USER SAAT INI
+========================================================= */
+
 .current-user-row .rank-content {
     background-color: #FFF3E0;
+
     border-radius: 8px;
+
     border: 1px solid #FFE0B2;
-    box-shadow: 0 2px 8px rgba(230, 126, 34, 0.15);
+
+    box-shadow:
+        0 2px 8px rgba(230, 126, 34, 0.15);
+
+    padding-top: 6px;
+    padding-bottom: 6px;
 }
+
 
 .current-user-row .rank-number {
     color: #E67E22;
 }
 
-/* =========================================
-   RESPONSIVE DESIGN (TABLET & MOBILE)
-   ========================================= */
-@media (max-width: 1024px) {
-    .stats-row {
-        grid-template-columns: repeat(2, 1fr);
-    }
+
+/* =========================================================
+   CURRENT USER DI LUAR TOP 10
+========================================================= */
+
+.rank-list>div[style*="border-top"] {
+    margin-top: 20px !important;
+    padding-top: 20px !important;
 }
 
+
+/* =========================================================
+   RESPONSIVE - TABLET
+========================================================= */
+
+@media (max-width: 1024px) {
+
+    .main-content {
+        padding: 35px 35px;
+    }
+
+    .stats-row {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 15px;
+    }
+
+    .stat-card {
+        padding: 14px 16px;
+    }
+
+    .stat-value {
+        font-size: 21px;
+    }
+
+    .table-header,
+    .rank-item .rank-content {
+        grid-template-columns:
+            minmax(0, 1fr) 150px 250px;
+    }
+
+    .rank-item .col-points {
+        width: 150px !important;
+        min-width: 150px;
+    }
+
+    .rank-item .col-league {
+        width: 250px !important;
+        min-width: 250px;
+    }
+
+    .table-header {
+        font-size: 16px;
+    }
+
+}
+
+
+/* =========================================================
+   RESPONSIVE - MOBILE
+========================================================= */
+
 @media (max-width: 768px) {
+
     .app-container {
         flex-direction: column;
     }
 
+
+    /* SIDEBAR MOBILE */
     .sidebar {
         width: 100%;
         height: 70px;
+
         position: fixed;
+
         top: auto;
         bottom: 0;
+
         flex-direction: row;
+
         padding: 0;
+
         border-right: none;
-        box-shadow: 0 -4px 10px rgba(0,0,0,0.05);
+
+        box-shadow:
+            0 -4px 10px rgba(0, 0, 0, 0.05);
+
         z-index: 1000;
     }
 
-    .sidebar-logo, .logo-top {
+
+    .sidebar-logo,
+    .logo-top {
         display: none;
     }
 
+
     .side-nav {
         flex-direction: row;
+
         gap: 0;
+
         height: 100%;
+
         align-items: stretch;
     }
 
+
     .nav-item {
         flex: 1;
+
         padding: 0;
+
         display: flex;
+
         justify-content: center;
+
         align-items: center;
     }
 
+
     .nav-item.active {
         width: auto;
+
         margin-right: 0;
+
         border-radius: 15px;
+
         margin: 10px;
+
         align-self: stretch;
     }
 
+
+    /* MAIN */
     .main-content {
-        padding: 20px 20px 100px 20px;
+        padding:
+            20px 20px 100px 20px;
     }
 
+
+    /* STATISTICS */
     .stats-row {
         grid-template-columns: 1fr;
+
+        gap: 15px;
+
+        margin-bottom: 35px;
     }
 
+
+    .stat-card {
+        width: 100%;
+    }
+
+
+    /* LEADERBOARD */
+    .leaderboard-axis {
+        overflow-x: auto;
+        padding-bottom: 10px;
+    }
+
+
+    /*
+       Hilangkan garis vertikal besar
+       pada mobile agar tidak mengganggu
+    */
     .leaderboard-axis::before {
         left: 40px;
+        width: 3px;
     }
+
+
+    /*
+       Di mobile kolom dibuat lebih kecil
+    */
+    .table-header,
+    .rank-item .rank-content {
+        grid-template-columns:
+            minmax(180px, 1fr) 100px 190px;
+    }
+
 
     .table-header {
         margin-left: 40px;
+
+        width: calc(100% - 40px);
+
         padding-left: 10px;
+
         font-size: 14px;
+
+        min-width: 490px;
     }
+
+
+    .rank-item {
+        min-width: 530px;
+    }
+
 
     .rank-number {
         width: 40px;
+        min-width: 40px;
+
         padding-right: 10px;
+
         font-size: 18px;
     }
+
 
     .rank-content {
         margin-left: 10px;
     }
+
+
+    .rank-item .col-user {
+        font-size: 14px !important;
+
+        gap: 8px !important;
+
+        padding-left: 8px !important;
+    }
+
+
+    .rank-item .col-points {
+        width: 100px !important;
+        min-width: 100px;
+
+        font-size: 14px !important;
+    }
+
+
+    .rank-item .col-league {
+        width: 190px !important;
+        min-width: 190px;
+
+        font-size: 12px !important;
+
+        gap: 5px !important;
+    }
+
+
+    .leaderboard-avatar {
+        width: 32px;
+        height: 32px;
+    }
+
+
+    .league-icon {
+        width: 32px;
+        height: 32px;
+    }
+
+
+    .cluster-wrapper {
+        width: 34px;
+        height: 34px;
+    }
+
+
+    .col-points img {
+        width: 18px;
+        height: 18px;
+    }
+
 }
 
-/* =========================================
-   DARK MODE OVERRIDES
-   ========================================= */
+
+/* =========================================================
+   DARK MODE
+========================================================= */
+
 body.dark-mode {
-    background: linear-gradient(180deg, #12121e 0%, #1a1a2e 100%);
+    background:
+        linear-gradient(180deg,
+            #12121e 0%,
+            #1a1a2e 100%);
+
     color: #f8f9fa;
 }
 
+
 body.dark-mode .sidebar {
     background-color: #1a1a2e;
-    border-right: 1px solid #2d2d44;
+
+    border-right:
+        1px solid #2d2d44;
 }
 
+
 @media (max-width: 768px) {
+
     body.dark-mode .sidebar {
         border-right: none;
-        border-top: 1px solid #2d2d44;
+
+        border-top:
+            1px solid #2d2d44;
     }
+
 }
+
 
 body.dark-mode .nav-item {
     color: #8a8a9e;
 }
 
+
 body.dark-mode .nav-item.active {
     background-color: #F8CB2E;
+
     color: #1a1a2e;
 }
 
+
 body.dark-mode .stat-card {
     background-color: #3e2412;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-    border: 1px solid #633611;
+
+    box-shadow:
+        0 4px 10px rgba(0, 0, 0, 0.3);
+
+    border:
+        1px solid #633611;
 }
 
-body.dark-mode .current-user-row .rank-content {
-    background-color: #3e2412;
-    border-color: #633611;
+
+body.dark-mode .stat-value {
+    color: #FFB13B;
 }
 
-body.dark-mode .current-user-row .rank-number {
-    color: #E67E22;
-}
 
 body.dark-mode .stat-label {
     color: #a3a3b5;
 }
 
+
+body.dark-mode .current-user-row .rank-content {
+    background-color: #3e2412;
+
+    border-color: #633611;
+}
+
+
+body.dark-mode .current-user-row .rank-number {
+    color: #E67E22;
+}
+
+
 body.dark-mode .leaderboard-axis::before {
     background-color: #f8f9fa;
 }
 
+
 body.dark-mode .table-header {
-    border-bottom: 4px solid #f8f9fa;
+    border-bottom:
+        4px solid #f8f9fa;
+
     color: #f8f9fa;
 }
 
+
 body.dark-mode .rank-number {
     color: #f8f9fa;
+}
+
+
+/* =========================================================
+   TAMBAHAN UNTUK TEKS KLASTER
+========================================================= */
+
+.cluster-wrapper+span,
+.col-league span {
+    line-height: 1.2;
+}
+
+
+/* =========================================================
+   SCROLLBAR HORIZONTAL MOBILE
+========================================================= */
+
+@media (max-width: 768px) {
+
+    .leaderboard-axis::-webkit-scrollbar {
+        height: 6px;
+    }
+
+    .leaderboard-axis::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.05);
+        border-radius: 10px;
+    }
+
+    .leaderboard-axis::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.25);
+        border-radius: 10px;
+    }
+
+    body.dark-mode .leaderboard-axis::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    body.dark-mode .leaderboard-axis::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.25);
+    }
+
 }
