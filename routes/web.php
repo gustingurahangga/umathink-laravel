@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\User;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardadminController;
 use App\Http\Controllers\RegisterController;
