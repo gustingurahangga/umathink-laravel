@@ -237,11 +237,12 @@ Route::group(['middleware' => ['auth', 'check_role:customer', 'check_status']], 
 
     Route::get('/leaderboard', function () {
 
-    $users = \App\Models\User::where('role', 'customer')
-        ->orderByDesc('total_poin')
-        ->orderBy('id')
-        ->take(10)
-        ->get();
+    $users = User::where('role', 'customer')
+    ->withSum('levelScores as total_bintang', 'stars')
+    ->orderByDesc('total_bintang')
+    ->orderBy('id', 'asc')
+    ->take(10)
+    ->get();
 
     return view(
         'customer.leaderboard',
@@ -307,10 +308,34 @@ Route::group(['middleware' => ['auth', 'check_role:admin']], function () {
     })->name('admin.users.store');
 
     Route::delete('/admin/users/{id}', function ($id) {
-        $user = \App\Models\User::findOrFail($id);
+
+    $user = \App\Models\User::findOrFail($id);
+
+    \DB::transaction(function () use ($user) {
+
+        // Hapus data verifikasi user terlebih dahulu
+        \DB::table('verifications')
+            ->where('user_id', $user->id)
+            ->delete();
+
+        // Hapus score user
+        \DB::table('user_level_scores')
+            ->where('user_id', $user->id)
+            ->delete();
+
+        // Hapus progress user
+        \DB::table('user_progress')
+            ->where('user_id', $user->id)
+            ->delete();
+
+        // Terakhir hapus user
         $user->delete();
-        return redirect()->back();
-    })->name('admin.users.delete');
+    });
+
+    return redirect()
+        ->back()
+        ->with('success', 'Pengguna berhasil dihapus.');
+});
 
     Route::get('/admin/games', function () {
         $games = \App\Models\GameCategory::all();
