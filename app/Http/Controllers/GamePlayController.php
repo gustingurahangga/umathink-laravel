@@ -22,9 +22,14 @@ class GamePlayController extends Controller
      * dan membuka level berikutnya.
      */
     private const MINIMUM_PASSING_POINT = 18;
+    /**
+    * Bonus poin untuk setiap soal matching
+    * yang dijawab benar.
+    */
+    private const MATCHING_BONUS_POINT = 6;
 
     /**
-     * Menentukan poin berdasarkan jumlah jawaban benar.
+     * Menentukan poin dasar berdasarkan jumlah jawaban benar.
      *
      * 0-5  = 0 poin
      * 6    = 18 poin
@@ -32,6 +37,9 @@ class GamePlayController extends Controller
      * 8    = 24 poin
      * 9    = 27 poin
      * 10   = 30 poin
+     *
+     * Bonus matching dihitung terpisah sebesar +6
+     * untuk setiap soal matching yang dijawab benar.
      */
     private function calculatePoint(int $correctAnswers): int
     {
@@ -40,6 +48,41 @@ class GamePlayController extends Controller
         }
 
         return $correctAnswers * 3;
+    }
+
+    /**
+     * Menentukan bonus poin dari soal matching.
+     *
+     * Setiap soal matching yang dijawab benar
+     * mendapatkan tambahan +6 poin.
+     *
+     * Jika salah, bonus = 0.
+     * Tidak ada pengurangan poin.
+     */
+    private function calculateMatchingBonus($questions, array $attemptAnswers): int
+    {
+        $bonus = 0;
+
+        foreach ($attemptAnswers as $questionNumber => $isCorrect) {
+
+            // Hanya jawaban benar yang mendapatkan bonus.
+            if ($isCorrect !== true) {
+                continue;
+            }
+
+            $index = ((int) $questionNumber) - 1;
+
+            $question = $questions->get($index);
+
+            if (
+                $question &&
+                $question->tipe_soal === 'matching'
+            ) {
+                $bonus += self::MATCHING_BONUS_POINT;
+            }
+        }
+
+        return $bonus;
     }
 
     /**
@@ -582,12 +625,45 @@ class GamePlayController extends Controller
             ->count();
 
         /*
-         * Hitung poin berdasarkan jumlah benar.
+         * ================================
+         * HITUNG POIN DASAR
+         * ================================
+         *
+         * 0-5  = 0 poin
+         * 6    = 18 poin
+         * 7    = 21 poin
+         * 8    = 24 poin
+         * 9    = 27 poin
+         * 10   = 30 poin
          */
-        $poin = $this->calculatePoint($correctAnswers);
+        $basePoin = $this->calculatePoint($correctAnswers);
 
         /*
-         * Hitung bintang.
+         * ================================
+         * BONUS MATCHING
+         * ================================
+         *
+         * Setiap matching yang benar:
+         * +6 poin.
+         *
+         * Matching salah:
+         * +0 poin.
+         *
+         * Tidak ada pengurangan poin.
+         */
+        $matchingBonus = $this->calculateMatchingBonus(
+            $questions,
+            $attemptAnswers
+        );
+
+        /*
+         * Total poin level = poin dasar + bonus matching.
+         */
+        $poin = $basePoin + $matchingBonus;
+
+        /*
+         * Bintang tetap dihitung hanya berdasarkan
+         * jumlah jawaban benar.
          */
         $stars = $this->calculateStars($correctAnswers);
 

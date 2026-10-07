@@ -190,6 +190,109 @@
 
 
         /* =========================================================
+           MATCHING FEEDBACK & STATE
+        ========================================================== */
+
+        .matching-feedback {
+            min-height: 32px;
+            margin-top: 16px;
+            margin-bottom: 6px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            text-align: center;
+
+            font-size: 14px;
+            font-weight: 800;
+
+            opacity: 0;
+            transform: translateY(-4px);
+
+            transition:
+                opacity 0.2s ease,
+                transform 0.2s ease;
+        }
+
+        .matching-feedback.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .matching-feedback.success {
+            color: #27AE60;
+        }
+
+        .matching-feedback.error {
+            color: #E74C3C;
+        }
+
+        .matching-item.match-wrong {
+            background: #E74C3C !important;
+            color: #fff !important;
+
+            outline: 3px solid rgba(231, 76, 60, 0.18);
+
+            box-shadow:
+                0 0 0 3px rgba(231, 76, 60, 0.12),
+                0 6px 16px rgba(231, 76, 60, 0.25);
+
+            animation:
+                matchingWrongShake 0.45s ease;
+        }
+
+        .matching-item.match-correct {
+            background: #27AE60 !important;
+            color: #fff !important;
+
+            outline: 3px solid rgba(39, 174, 96, 0.18);
+
+            box-shadow:
+                0 0 0 3px rgba(39, 174, 96, 0.12),
+                0 6px 16px rgba(39, 174, 96, 0.25);
+        }
+
+        .matching-warning.show {
+            display: block;
+        }
+
+        @keyframes matchingWrongShake {
+            0% {
+                transform: translateX(0);
+            }
+
+            20% {
+                transform: translateX(-8px);
+            }
+
+            40% {
+                transform: translateX(8px);
+            }
+
+            60% {
+                transform: translateX(-6px);
+            }
+
+            80% {
+                transform: translateX(6px);
+            }
+
+            100% {
+                transform: translateX(0);
+            }
+        }
+
+        body.dark-mode .matching-feedback.success {
+            color: #2ecc71;
+        }
+
+        body.dark-mode .matching-feedback.error {
+            color: #ff7675;
+        }
+
+
+        /* =========================================================
            BUTTON DISABLED
         ========================================================== */
 
@@ -205,6 +308,11 @@
         ========================================================== */
 
         @media (max-width: 700px) {
+
+            .matching-feedback {
+                font-size: 13px;
+                margin-top: 12px;
+            }
 
             .matching-columns {
                 gap: 10px;
@@ -681,6 +789,12 @@
 
 
                                     <div
+                                        class="matching-feedback"
+                                        id="matchingFeedback"
+                                        aria-live="polite"
+                                    ></div>
+
+                                    <div
                                         class="matching-warning"
                                         id="matchingWarning"
                                     >
@@ -942,6 +1056,11 @@
                 let selectedLeft = null;
                 let selectedRight = null;
 
+                /*
+                 * Mencegah user melakukan klik lain ketika
+                 * animasi jawaban salah sedang berjalan.
+                 */
+                let matchingBusy = false;
 
                 const leftItems =
                     document.querySelectorAll(
@@ -968,25 +1087,31 @@
                         'matchingWarning'
                     );
 
+                const matchingFeedback =
+                    document.getElementById(
+                        'matchingFeedback'
+                    );
+
                 const totalPairs =
                     {{ count($matchingPairs) }};
 
+
+                /* =====================================================
+                   UPDATE HIDDEN INPUT + STATUS
+                ====================================================== */
 
                 function updateMatchingInput() {
 
                     matchingInput.value =
                         JSON.stringify(matchingAnswers);
 
-
                     const completedPairs =
                         Object.keys(
                             matchingAnswers
                         ).length;
 
-
                     matchingStatus.textContent =
                         `${completedPairs} / ${totalPairs} pasangan telah dicocokkan`;
-
 
                     if (
                         completedPairs === totalPairs
@@ -1010,9 +1135,45 @@
                         );
 
                     }
-
                 }
 
+
+                /* =====================================================
+                   FEEDBACK
+                ====================================================== */
+
+                function showMatchingFeedback(
+                    message,
+                    type
+                ) {
+
+                    if (!matchingFeedback) {
+                        return;
+                    }
+
+                    matchingFeedback.textContent =
+                        message;
+
+                    matchingFeedback.className =
+                        `matching-feedback show ${type}`;
+
+                    clearTimeout(
+                        matchingFeedback._timeout
+                    );
+
+                    matchingFeedback._timeout =
+                        setTimeout(() => {
+
+                            matchingFeedback.className =
+                                'matching-feedback';
+
+                        }, 1100);
+                }
+
+
+                /* =====================================================
+                   SELECTION
+                ====================================================== */
 
                 function clearSelection() {
 
@@ -1023,7 +1184,6 @@
                         );
 
                     });
-
 
                     rightItems.forEach(item => {
 
@@ -1036,36 +1196,184 @@
                 }
 
 
+                /* =====================================================
+                   CEK PASANGAN
+                ====================================================== */
+
+                function isCorrectMatching(
+                    leftValue,
+                    rightValue
+                ) {
+
+                    const correctPairs =
+                        @json($matchingPairs);
+
+                    return correctPairs.some(pair => {
+
+                        if (
+                            !pair ||
+                            typeof pair !== 'object'
+                        ) {
+                            return false;
+                        }
+
+                        return (
+                            String(pair.kiri).trim() ===
+                                String(leftValue).trim()
+                            &&
+                            String(pair.kanan).trim() ===
+                                String(rightValue).trim()
+                        );
+
+                    });
+                }
+
+
+                /* =====================================================
+                   AMBIL ELEMEN
+                ====================================================== */
+
+                function getLeftElement(value) {
+
+                    return document.querySelector(
+                        `.matching-left-item[data-left="${CSS.escape(value)}"]`
+                    );
+
+                }
+
+
+                function getRightElement(value) {
+
+                    return document.querySelector(
+                        `.matching-right-item[data-right="${CSS.escape(value)}"]`
+                    );
+
+                }
+
+
+                /* =====================================================
+                   PROSES MATCHING
+                ====================================================== */
+
                 function createMatch() {
 
                     if (
                         !selectedLeft ||
-                        !selectedRight
+                        !selectedRight ||
+                        matchingBusy
                     ) {
                         return;
                     }
 
+                    matchingBusy = true;
 
-                    matchingAnswers[selectedLeft] =
+                    const leftValue =
+                        selectedLeft;
+
+                    const rightValue =
                         selectedRight;
 
-
                     const leftElement =
-                        document.querySelector(
-                            `.matching-left-item[data-left="${CSS.escape(selectedLeft)}"]`
-                        );
-
+                        getLeftElement(leftValue);
 
                     const rightElement =
-                        document.querySelector(
-                            `.matching-right-item[data-right="${CSS.escape(selectedRight)}"]`
+                        getRightElement(rightValue);
+
+
+                    /* =================================================
+                       JAWABAN SALAH
+                    ================================================== */
+
+                    if (
+                        !isCorrectMatching(
+                            leftValue,
+                            rightValue
+                        )
+                    ) {
+
+                        /*
+                         * Tandai kedua pilihan dengan warna merah.
+                         */
+                        if (leftElement) {
+
+                            leftElement.classList.add(
+                                'match-wrong'
+                            );
+
+                        }
+
+                        if (rightElement) {
+
+                            rightElement.classList.add(
+                                'match-wrong'
+                            );
+
+                        }
+
+
+                        showMatchingFeedback(
+                            '✕ Tidak cocok, coba lagi!',
+                            'error'
                         );
+
+
+                        /*
+                         * Jangan masukkan ke matchingAnswers.
+                         *
+                         * Artinya:
+                         * - tidak dihitung benar
+                         * - tidak mendapat bonus +6
+                         * - tidak ada pengurangan poin
+                         */
+                        setTimeout(() => {
+
+                            if (leftElement) {
+
+                                leftElement.classList.remove(
+                                    'selected',
+                                    'match-wrong'
+                                );
+
+                            }
+
+                            if (rightElement) {
+
+                                rightElement.classList.remove(
+                                    'selected',
+                                    'match-wrong'
+                                );
+
+                            }
+
+                            selectedLeft = null;
+                            selectedRight = null;
+
+                            matchingBusy = false;
+
+                        }, 650);
+
+
+                        return;
+                    }
+
+
+                    /* =================================================
+                       JAWABAN BENAR
+                    ================================================== */
+
+                    matchingAnswers[leftValue] =
+                        rightValue;
 
 
                     if (leftElement) {
 
+                        leftElement.classList.remove(
+                            'selected'
+                        );
+
                         leftElement.classList.add(
-                            'matched'
+                            'matched',
+                            'match-correct'
                         );
 
                     }
@@ -1073,24 +1381,64 @@
 
                     if (rightElement) {
 
+                        rightElement.classList.remove(
+                            'selected'
+                        );
+
                         rightElement.classList.add(
-                            'matched'
+                            'matched',
+                            'match-correct'
                         );
 
                     }
 
 
+                    showMatchingFeedback(
+                        '✓ Cocok!',
+                        'success'
+                    );
+
+
                     selectedLeft = null;
-
                     selectedRight = null;
-
 
                     clearSelection();
 
                     updateMatchingInput();
 
+
+                    /*
+                     * Setelah sebentar, hilangkan kelas visual
+                     * hijau tetapi tetap pertahankan matched.
+                     */
+                    setTimeout(() => {
+
+                        if (leftElement) {
+
+                            leftElement.classList.remove(
+                                'match-correct'
+                            );
+
+                        }
+
+                        if (rightElement) {
+
+                            rightElement.classList.remove(
+                                'match-correct'
+                            );
+
+                        }
+
+                        matchingBusy = false;
+
+                    }, 500);
+
                 }
 
+
+                /* =====================================================
+                   KLIK PILIHAN KIRI
+                ====================================================== */
 
                 leftItems.forEach(item => {
 
@@ -1102,11 +1450,16 @@
                                 this.classList.contains(
                                     'matched'
                                 )
+                                ||
+                                matchingBusy
                             ) {
                                 return;
                             }
 
 
+                            /*
+                             * Ganti pilihan kiri yang sedang aktif.
+                             */
                             leftItems.forEach(
                                 left => {
 
@@ -1130,11 +1483,14 @@
                                 'selected'
                             );
 
-
                             selectedLeft =
                                 this.dataset.left;
 
 
+                            /*
+                             * Kalau kanan sudah dipilih,
+                             * langsung periksa pasangan.
+                             */
                             createMatch();
 
                         }
@@ -1142,6 +1498,10 @@
 
                 });
 
+
+                /* =====================================================
+                   KLIK PILIHAN KANAN
+                ====================================================== */
 
                 rightItems.forEach(item => {
 
@@ -1153,11 +1513,16 @@
                                 this.classList.contains(
                                     'matched'
                                 )
+                                ||
+                                matchingBusy
                             ) {
                                 return;
                             }
 
 
+                            /*
+                             * Ganti pilihan kanan yang sedang aktif.
+                             */
                             rightItems.forEach(
                                 right => {
 
@@ -1181,11 +1546,14 @@
                                 'selected'
                             );
 
-
                             selectedRight =
                                 this.dataset.right;
 
 
+                            /*
+                             * Kalau kiri sudah dipilih,
+                             * langsung periksa pasangan.
+                             */
                             createMatch();
 
                         }
@@ -1193,6 +1561,10 @@
 
                 });
 
+
+                /* =====================================================
+                   BUTTON PERIKSA
+                ====================================================== */
 
                 btnCheck.addEventListener(
                     'click',
@@ -1213,20 +1585,24 @@
                             matchingWarning.style.display =
                                 'block';
 
+                            matchingWarning.classList.add(
+                                'show'
+                            );
+
                         }
 
                     }
                 );
 
 
+                /*
+                 * Kondisi awal.
+                 */
                 updateMatchingInput();
 
             @endif
 
 
-            /* =====================================================
-               TIMER
-            ====================================================== */
 
             let timeLeft =
                 {{ $currentQuestion->waktu ?? 60 }};

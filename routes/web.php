@@ -15,6 +15,10 @@ Route::get('/tentang-kami', function () {
     return view('customer.aboutus');
 });
 
+Route::get('/pricelist', function () {
+    return view('customer.pricelist');
+})->name('pricelist');
+
 Route::get('/login', fn() => view('auth.halamanlogin'))->name('login');
 Route::post('/login', [AuthController::class, 'login']);
 
